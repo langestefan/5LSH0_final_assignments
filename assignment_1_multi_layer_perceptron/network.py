@@ -78,26 +78,25 @@ class Network:
         # 4. Cross entropy for the loss layer
 
         # input --> hidden layer 1
+        # TODO: compute as matrix multiplication: weight matrix*input
         for node_id in range(self.hidden1_dim):
             # node input = dotproduct of weights with input + bias
             self.pre_hidden1[node_id] = np.dot(self.input, self.weights_input_hidden1[:, node_id]) + \
                                         self.bias_hidden1[node_id]
             # node output = activationF(input)
             node_activ = activation.relu(self.pre_hidden1[node_id])
+            # print('node_activ: {}'.format(node_activ))
             self.hidden1_activation[node_id] = node_activ
 
         # hidden layer 1 --> output
+        # TODO: compute as matrix multiplication: weight matrix*input
         for node_id in range(self.output_dim):
             # node input = dotproduct of weights with input + bias
             self.pre_output[node_id] = np.dot(self.hidden1_activation, self.weights_hidden1_output[:, node_id]) + \
                                        self.bias_output[node_id]
 
         # apply softmax to output layer
-        print('Input: {0}'.format(self.pre_output))
         self.output_activation = activation.softmax(self.pre_output)
-        print('Output: {0}'.format(self.output_activation))
-
-        # after forward pass is done we return the loss
 
     def backward_pass(self):
         """

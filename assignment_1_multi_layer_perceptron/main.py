@@ -2,10 +2,15 @@ from torchvision import datasets
 import torch
 import torchvision
 import numpy as np
-from activation import relu, sigmoid
+from activation import cross_entropy
 import network
 import matplotlib.pyplot as plt
 from math import floor
+
+# Some sources:
+# https://towardsdatascience.com/batch-mini-batch-stochastic-gradient-descent-7a62ecba642a
+# https://machinelearningmastery.com/gentle-introduction-mini-batch-gradient-descent-configure-batch-size/
+# https://sgugger.github.io/a-simple-neural-net-in-numpy.html
 
 
 def import_data(batch_size_train_s, batch_size_test_s):
@@ -37,13 +42,21 @@ def train():
     :return: N/A
     """
     # we get 60000/64 = 937 minibatches with 60000%64 = 32 samples left
+    one_hot_label = np.zeros(10, dtype=np.uint8)
     for batch_id, (mini_batch, label) in enumerate(train_data):
-        # print('New batch: {0}'.format(batch_id))
         for sample_id, sample in enumerate(mini_batch):
-            # Flatten input, create 748,1 input vector
+            # Flatten input, create 748, input vector
             flat_sample = (np.array(sample)).reshape((network.input_dim, 1))
+
             # Forward pass one sample to network
             network.forward_pass(flat_sample)
+
+            # after forward pass we return the loss using Cross Entropy loss function
+            one_hot_label[label[sample_id]] = 1  # we require one-hot encoding for our input data
+            loss = cross_entropy(network.output_activation, one_hot_label)
+            one_hot_label[:] = 0  # clear variable
+
+            print('Loss: {}'.format(loss))
 
 
 if __name__ == '__main__':
