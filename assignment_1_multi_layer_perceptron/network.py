@@ -24,6 +24,13 @@ class Network:
         self.pre_output = []
         self.bias_output = []
 
+        # gradients
+        # to keep track of the sum of the gradients
+        self.sum_grad_w_hidden1 = []
+        self.sum_grad_w_output = []
+        self.sum_grad_b_hidden1 = []
+        self.sum_grad_b_output = []
+
     def init_neurons(self):
         """
         Create neuron arrays
@@ -43,6 +50,12 @@ class Network:
         self.pre_hidden1 = np.zeros(self.hidden1_dim)
         self.pre_output = np.zeros(self.output_dim)
 
+        # gradients
+        self.sum_grad_w_hidden1 = np.zeros((self.input_dim, self.hidden1_dim))
+        self.sum_grad_w_output = np.zeros((self.hidden1_dim, self.output_dim))
+        self.sum_grad_b_hidden1 = np.zeros(self.hidden1_dim)
+        self.sum_grad_b_output = np.zeros(self.output_dim)
+
         print('input: {0}'.format(self.input.shape))
         print('hidden1_activation: {0}'.format(self.hidden1_activation.shape))
         print('bias_hidden1: {0}'.format(self.bias_hidden1.shape))
@@ -55,7 +68,7 @@ class Network:
         :return: N/A
         """
         # to keep same weights next time program is run
-        # np.random.seed(5)
+        np.random.seed(5)
         # random uniform initialization for weights
         self.weights_input_hidden1 = np.random.uniform(-1, 1, (self.input_dim, self.hidden1_dim))
         self.weights_hidden1_output = np.random.uniform(-1, 1, (self.hidden1_dim, self.output_dim))
@@ -98,9 +111,44 @@ class Network:
         # apply softmax to output layer
         self.output_activation = activation.softmax(self.pre_output)
 
-    def backward_pass(self):
+    def backward_pass(self, label):
         """
-        Update weights
+        Compute just derivatives for a single backwards pass. This function will NOT update the weights!
+        :param label: One-hot encoded label vector of length 10. Example: [0 0 0 0 0 0 1 0 0 0] = 7
+        :return: N/A?
+        """
+        # gradient from error to the input of the output (softmax) node
+        gradient_output = activation.softmax_bw(self.output_activation, label)
+        # print('gradient: {}'.format(gradient_output))
+
+        # 1. compute gradient for weights in output layer
+        # should give (40,10) matrix
+
+        # gradient_weight_output = np.matmul(self.hidden1_activation, gradient_output)
+
+        for node_id in range(self.hidden1_dim):
+            result_h1_node = self.hidden1_activation[node_id] * gradient_output
+            # print('result: {}'.format(result))
+            self.sum_grad_w_output[node_id, :] = result_h1_node
+
+        sum_grad_w_outputmatmul = np.matmul(np.transpose([self.hidden1_activation]), [gradient_output])
+
+        print('result for loop: {}'.format(self.sum_grad_w_output))
+        print('result matmul: {}'.format(sum_grad_w_outputmatmul))
+        # print('result_shape: {}'.format(np.shape(self.sum_grad_w_output)))
+
+
+        # 2. compute gradient for biases in output layer
+
+        # 3. compute gradient for weights in hidden layer
+
+        # 4. compute gradient for biases in hidden layer
+
+    def update(self, learning_rate, step_weight, step_bias):
+        """
+        Update the weights and biases
+        :param learning_rate:
+        :param step_weight:
+        :param step_bias:
         :return:
         """
-        print(1)

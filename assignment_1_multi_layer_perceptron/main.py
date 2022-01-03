@@ -7,10 +7,13 @@ import network
 import matplotlib.pyplot as plt
 from math import floor
 
+
 # Some sources:
 # https://towardsdatascience.com/batch-mini-batch-stochastic-gradient-descent-7a62ecba642a
 # https://machinelearningmastery.com/gentle-introduction-mini-batch-gradient-descent-configure-batch-size/
 # https://sgugger.github.io/a-simple-neural-net-in-numpy.html
+# https://stats.stackexchange.com/a/306710
+# https://www.youtube.com/watch?v=znqbtL0fRA0&ab_channel=MLDawn
 
 
 def import_data(batch_size_train_s, batch_size_test_s):
@@ -44,6 +47,7 @@ def train():
     # we get 60000/64 = 937 minibatches with 60000%64 = 32 samples left
     one_hot_label = np.zeros(10, dtype=np.uint8)
     for batch_id, (mini_batch, label) in enumerate(train_data):
+
         for sample_id, sample in enumerate(mini_batch):
             # Flatten input, create 748, input vector
             flat_sample = (np.array(sample)).reshape((network.input_dim, 1))
@@ -54,9 +58,18 @@ def train():
             # after forward pass we return the loss using Cross Entropy loss function
             one_hot_label[label[sample_id]] = 1  # we require one-hot encoding for our input data
             loss = cross_entropy(network.output_activation, one_hot_label)
+            print('Loss: {}'.format(loss))
+
+            # start backward pass
+            network.backward_pass(one_hot_label)
+
+            # clear label at the end of each sample
             one_hot_label[:] = 0  # clear variable
 
-            print('Loss: {}'.format(loss))
+        # when we exit the for loop and have treated all samples in our minibatch, we average the update to our weights
+        # and update the final weights by this average
+
+        # network.update(weights, biases)
 
 
 if __name__ == '__main__':
@@ -81,18 +94,6 @@ if __name__ == '__main__':
 
     # import data
     train_data, test_data = import_data(batch_size_train, batch_size_test)
-
-    # Display image and label.
-    # train_features, train_labels = next(iter(train_data))
-    # print(f"Feature batch shape: {train_features.size()}")
-    # print(f"Labels batch shape: {train_labels.size()}")
-    # img = train_features[0].squeeze()
-    # label = train_labels[0]
-    # plt.imshow(img, cmap="gray")
-    # plt.show()
-    # print(f"Label: {label}")
-    #
-    # label = train_labels[0]
 
     # start training
     for epoch in range(n_epochs):
