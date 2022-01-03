@@ -65,7 +65,6 @@ def cross_entropy(predictions, label):
     :param label: One-hot encoded label vector. Example: [0 0 0 0 0 0 1 0 0 0] = 7
     :return: Cross-entropy
     """
-    print('labels: {}'.format(label))
     n = np.size(label)
     eps = 1e-12
     ce = -np.dot(label, np.log(predictions + eps)) / n

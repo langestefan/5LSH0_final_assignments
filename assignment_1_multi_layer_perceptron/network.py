@@ -121,22 +121,9 @@ class Network:
         gradient_output = activation.softmax_bw(self.output_activation, label)
         # print('gradient: {}'.format(gradient_output))
 
-        # 1. compute gradient for weights in output layer
-        # should give (40,10) matrix
-
-        # gradient_weight_output = np.matmul(self.hidden1_activation, gradient_output)
-
-        for node_id in range(self.hidden1_dim):
-            result_h1_node = self.hidden1_activation[node_id] * gradient_output
-            # print('result: {}'.format(result))
-            self.sum_grad_w_output[node_id, :] = result_h1_node
-
-        sum_grad_w_outputmatmul = np.matmul(np.transpose([self.hidden1_activation]), [gradient_output])
-
-        print('result for loop: {}'.format(self.sum_grad_w_output))
-        print('result matmul: {}'.format(sum_grad_w_outputmatmul))
-        # print('result_shape: {}'.format(np.shape(self.sum_grad_w_output)))
-
+        # 1. compute gradient for weights in output layer, should give (40,10) matrix
+        # gradient_wij = h_j * (o_i - y_i) = vect_H^T * vect_gradient_output
+        grad_w_output = np.matmul(np.transpose([self.hidden1_activation]), [gradient_output])
 
         # 2. compute gradient for biases in output layer
 
@@ -144,11 +131,4 @@ class Network:
 
         # 4. compute gradient for biases in hidden layer
 
-    def update(self, learning_rate, step_weight, step_bias):
-        """
-        Update the weights and biases
-        :param learning_rate:
-        :param step_weight:
-        :param step_bias:
-        :return:
-        """
+        return grad_w_output  # , grad_b_output, grad_w_hidden, grad_b_hidden

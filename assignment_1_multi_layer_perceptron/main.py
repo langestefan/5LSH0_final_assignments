@@ -48,6 +48,11 @@ def train():
     one_hot_label = np.zeros(10, dtype=np.uint8)
     for batch_id, (mini_batch, label) in enumerate(train_data):
 
+        sum_grad_w_hidden1 = np.zeros((network.input_dim, network.hidden1_dim))
+        sum_grad_w_output = np.zeros((network.hidden1_dim, network.output_dim))
+        sum_grad_b_hidden1 = np.zeros(network.hidden1_dim)
+        sum_grad_b_output = np.zeros(network.output_dim)
+
         for sample_id, sample in enumerate(mini_batch):
             # Flatten input, create 748, input vector
             flat_sample = (np.array(sample)).reshape((network.input_dim, 1))
@@ -58,18 +63,23 @@ def train():
             # after forward pass we return the loss using Cross Entropy loss function
             one_hot_label[label[sample_id]] = 1  # we require one-hot encoding for our input data
             loss = cross_entropy(network.output_activation, one_hot_label)
-            print('Loss: {}'.format(loss))
 
             # start backward pass
-            network.backward_pass(one_hot_label)
+            sum_grad_w_output += network.backward_pass(one_hot_label)
+
+            # print('sum_grad_w_output: {}'.format(sum_grad_w_output))
 
             # clear label at the end of each sample
             one_hot_label[:] = 0  # clear variable
 
         # when we exit the for loop and have treated all samples in our minibatch, we average the update to our weights
         # and update the final weights by this average
+        grad_w_output = sum_grad_w_output / batch_size_train
 
-        # network.update(weights, biases)
+        # update network
+        network.weights_hidden1_output = learning_rate * network.weights_hidden1_output * grad_w_output
+
+        print('Batch {0}: Loss: {1}'.format(batch_id, loss))
 
 
 if __name__ == '__main__':
