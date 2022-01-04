@@ -1,7 +1,7 @@
 import numpy as np
 
 import activation
-from activation import relu, sigmoid
+from activation import cross_entropy
 
 
 class Network:
@@ -43,8 +43,10 @@ class Network:
         self.output_activation = np.zeros(self.output_dim)
 
         # bias
-        self.bias_hidden1 = np.zeros(self.hidden1_dim)
-        self.bias_output = np.zeros(self.output_dim)
+        # self.bias_hidden1 = np.zeros(self.hidden1_dim)
+        # self.bias_output = np.zeros(self.output_dim)
+        self.bias_hidden1 = np.random.uniform(-1, 1, self.hidden1_dim)
+        self.bias_output = np.random.uniform(-1, 1, self.output_dim)
 
         # input
         self.pre_hidden1 = np.zeros(self.hidden1_dim)
@@ -75,9 +77,10 @@ class Network:
         print('Weights vector input-->hidden1: {0}'.format(self.weights_input_hidden1.shape))
         print('Weights vector hidden1-->output: {0}'.format(self.weights_hidden1_output.shape))
 
-    def forward_pass(self, input_data):
+    def forward_pass(self, input_data, one_hot_label):
         """
         Updates all neurons for a single sample and computes the new output
+        :param one_hot_label:
         :param input_data: Input array of new samples
         :return: N/A
         """
@@ -110,6 +113,17 @@ class Network:
 
         # apply softmax to output layer
         self.output_activation = activation.softmax(self.pre_output)
+
+        # after forward pass we return the loss using Cross Entropy loss function
+        loss = cross_entropy(self.output_activation, one_hot_label)
+
+        # non-maximum supression on output vector
+        result = np.zeros_like(self.output_activation, dtype=np.uint8)
+        result[self.output_activation.argmax(0)] = 1
+
+        # print('result: {}'.format(result))
+
+        return loss, result
 
     def backward_pass(self, label):
         """

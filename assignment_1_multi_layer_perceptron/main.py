@@ -2,10 +2,9 @@ from torchvision import datasets
 import torch
 import torchvision
 import numpy as np
-from activation import cross_entropy
 import network
-import matplotlib.pyplot as plt
 from math import floor
+import time
 
 
 # Some sources:
@@ -61,11 +60,9 @@ def train():
             flat_sample = (np.array(sample)).reshape((network.input_dim, 1))
 
             # Forward pass one sample to network
-            network.forward_pass(flat_sample)
-
-            # after forward pass we return the loss using Cross Entropy loss function
             one_hot_label[label[sample_id]] = 1  # we require one-hot encoding for our input data
-            loss += cross_entropy(network.output_activation, one_hot_label)
+            lossr, result = network.forward_pass(flat_sample, one_hot_label)
+            loss += lossr
 
             # start backward pass
             w_out, b_out, w_hidden, b_hidden = network.backward_pass(one_hot_label)
@@ -94,7 +91,8 @@ def train():
         network.weights_input_hidden1 = network.weights_input_hidden1 - LR * grad_w_hidden
         network.bias_hidden1 = network.bias_hidden1 - LR * grad_b_hidden
 
-        print('Batch {0}: Loss: {1}'.format(batch_id, loss / batch_size_train))
+        if batch_id % 100 == 0:
+            print('Batch {0}: Loss: {1}'.format(batch_id, loss / batch_size_train))
 
 
 def test():
@@ -103,36 +101,48 @@ def test():
     :return: N/A
     """
     one_hot_label = np.zeros(10, dtype=np.uint8)
-    for batch_id, (mini_batch, label) in enumerate(train_data):
+    correct_n = 0
+    total_n = 0
 
-        sum_grad_w_hidden = np.zeros((network.input_dim, network.hidden1_dim))
-        sum_grad_w_output = np.zeros((network.hidden1_dim, network.output_dim))
-        sum_grad_b_hidden = np.zeros(network.hidden1_dim)
-        sum_grad_b_output = np.zeros(network.output_dim)
-
-        loss = 0
+    for batch_id, (mini_batch, label) in enumerate(test_data):
 
         for sample_id, sample in enumerate(mini_batch):
             # Flatten input, create 748, input vector
             flat_sample = (np.array(sample)).reshape((network.input_dim, 1))
 
             # Forward pass one sample to network
-            network.forward_pass(flat_sample)
+            one_hot_label[label[sample_id]] = 1  # we require one-hot encoding for our input data
+            lossr, result = network.forward_pass(flat_sample, one_hot_label)
+
+            # print('result {}'.format(result))
+            # print('label {}'.format(one_hot_label))
+
+            # check if sample was correctly classified
+            if (result == one_hot_label).all():
+                correct_n += 1
+
+            total_n += 1
+            one_hot_label[:] = 0
+
+    test_accuracy = (correct_n / total_n) * 100
+    return test_accuracy
+
 
 if __name__ == '__main__':
+    start_time = time.time()
     network = network.Network()
 
     # train settings
     n_train_samples = 60000
-    batch_size_train = 64
+    batch_size_train = 32
     batch_size_test = 1000
     LR = 0.01
     n_mini_batch = floor(n_train_samples / batch_size_train)
-    n_epochs = 5
+    n_epochs = 10
 
     # network settings
     network.input_dim = 28 * 28  # 784 pixels
-    network.hidden1_dim = 40
+    network.hidden1_dim = 300
     network.output_dim = 10
 
     # init network
@@ -144,8 +154,15 @@ if __name__ == '__main__':
 
     # train
     for epoch in range(n_epochs):
+        print('~~~~ %s seconds ~~~~' % round(time.time() - start_time, 0))
+        print('Epoch: {}'.format(epoch))
         train()
 
-    # test
-    test()
-    # test
+        # calculate test accuracy
+        test_accuracy = test()
+        print('Test accuracy: {}%'.format(test_accuracy))
+
+    # calculate train accuracy
+    test_data = train_data
+    train_accuracy = test()
+    print('Train accuracy: {}%'.format(train_accuracy))
