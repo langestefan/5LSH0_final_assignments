@@ -41,17 +41,20 @@ def import_data(batch_size_train_s, batch_size_test_s):
 
 def train():
     """
-    Traing the network.
+    Traing the network
     :return: N/A
     """
     # we get 60000/64 = 937 minibatches with 60000%64 = 32 samples left
     one_hot_label = np.zeros(10, dtype=np.uint8)
+
     for batch_id, (mini_batch, label) in enumerate(train_data):
 
-        sum_grad_w_hidden1 = np.zeros((network.input_dim, network.hidden1_dim))
+        sum_grad_w_hidden = np.zeros((network.input_dim, network.hidden1_dim))
         sum_grad_w_output = np.zeros((network.hidden1_dim, network.output_dim))
-        sum_grad_b_hidden1 = np.zeros(network.hidden1_dim)
+        sum_grad_b_hidden = np.zeros(network.hidden1_dim)
         sum_grad_b_output = np.zeros(network.output_dim)
+
+        loss = 0
 
         for sample_id, sample in enumerate(mini_batch):
             # Flatten input, create 748, input vector
@@ -62,10 +65,14 @@ def train():
 
             # after forward pass we return the loss using Cross Entropy loss function
             one_hot_label[label[sample_id]] = 1  # we require one-hot encoding for our input data
-            loss = cross_entropy(network.output_activation, one_hot_label)
+            loss += cross_entropy(network.output_activation, one_hot_label)
 
             # start backward pass
-            sum_grad_w_output += network.backward_pass(one_hot_label)
+            w_out, b_out, w_hidden, b_hidden = network.backward_pass(one_hot_label)
+            sum_grad_w_output += w_out
+            sum_grad_b_output += b_out
+            sum_grad_w_hidden += w_hidden
+            sum_grad_b_hidden += b_hidden
 
             # print('sum_grad_w_output: {}'.format(sum_grad_w_output))
 
@@ -75,12 +82,42 @@ def train():
         # when we exit the for loop and have treated all samples in our minibatch, we average the update to our weights
         # and update the final weights by this average
         grad_w_output = sum_grad_w_output / batch_size_train
+        grad_b_output = sum_grad_b_output / batch_size_train
+        grad_w_hidden = sum_grad_w_hidden / batch_size_train
+        grad_b_hidden = sum_grad_b_hidden / batch_size_train
+
+        # print('grad_b_output: {}'.format(grad_b_output))
 
         # update network
-        network.weights_hidden1_output = learning_rate * network.weights_hidden1_output * grad_w_output
+        network.weights_hidden1_output = network.weights_hidden1_output - LR * grad_w_output
+        network.bias_output = network.bias_output - LR * grad_b_output
+        network.weights_input_hidden1 = network.weights_input_hidden1 - LR * grad_w_hidden
+        network.bias_hidden1 = network.bias_hidden1 - LR * grad_b_hidden
 
-        print('Batch {0}: Loss: {1}'.format(batch_id, loss))
+        print('Batch {0}: Loss: {1}'.format(batch_id, loss / batch_size_train))
 
+
+def test():
+    """
+    Run test batches on trained network
+    :return: N/A
+    """
+    one_hot_label = np.zeros(10, dtype=np.uint8)
+    for batch_id, (mini_batch, label) in enumerate(train_data):
+
+        sum_grad_w_hidden = np.zeros((network.input_dim, network.hidden1_dim))
+        sum_grad_w_output = np.zeros((network.hidden1_dim, network.output_dim))
+        sum_grad_b_hidden = np.zeros(network.hidden1_dim)
+        sum_grad_b_output = np.zeros(network.output_dim)
+
+        loss = 0
+
+        for sample_id, sample in enumerate(mini_batch):
+            # Flatten input, create 748, input vector
+            flat_sample = (np.array(sample)).reshape((network.input_dim, 1))
+
+            # Forward pass one sample to network
+            network.forward_pass(flat_sample)
 
 if __name__ == '__main__':
     network = network.Network()
@@ -89,9 +126,9 @@ if __name__ == '__main__':
     n_train_samples = 60000
     batch_size_train = 64
     batch_size_test = 1000
-    learning_rate = 0.01
+    LR = 0.01
     n_mini_batch = floor(n_train_samples / batch_size_train)
-    n_epochs = 1
+    n_epochs = 5
 
     # network settings
     network.input_dim = 28 * 28  # 784 pixels
@@ -105,6 +142,10 @@ if __name__ == '__main__':
     # import data
     train_data, test_data = import_data(batch_size_train, batch_size_test)
 
-    # start training
+    # train
     for epoch in range(n_epochs):
         train()
+
+    # test
+    test()
+    # test

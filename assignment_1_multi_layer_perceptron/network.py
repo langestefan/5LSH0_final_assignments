@@ -126,9 +126,26 @@ class Network:
         grad_w_output = np.matmul(np.transpose([self.hidden1_activation]), [gradient_output])
 
         # 2. compute gradient for biases in output layer
+        # gradient_b = 1 * (o_i - y_i) = o_i - y_i
+        grad_b_output = gradient_output
 
-        # 3. compute gradient for weights in hidden layer
+        # 3. compute gradient for weights in hidden layer, should give (784,40) matrix
+        # we need to sum the gradient over the previous layer since there are now multiple paths
+        # gradient_w_hidden = sum(gradient_output) * relu_bw * input_i
+
+        # must be 40, vector for gradient of h1 hidden output
+        gradient_h1_s = np.sum(gradient_output * self.weights_hidden1_output, axis=1)
+
+        # must be 40, bw propagation for ReLU
+        relu_bw = activation.relu_bw(self.pre_hidden1)
+
+        # this is the gradient from the error function to the input of the hidden layer
+        gradient_e_to_h1_in = gradient_h1_s * relu_bw
+
+        # matrix product of gradient_e_to_h1_in with
+        grad_w_hidden = np.matmul(np.transpose([self.input]), [gradient_e_to_h1_in])
 
         # 4. compute gradient for biases in hidden layer
+        grad_b_hidden = gradient_e_to_h1_in
 
-        return grad_w_output  # , grad_b_output, grad_w_hidden, grad_b_hidden
+        return grad_w_output, grad_b_output, grad_w_hidden, grad_b_hidden
