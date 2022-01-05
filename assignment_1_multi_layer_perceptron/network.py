@@ -70,7 +70,7 @@ class Network:
         :return: N/A
         """
         # to keep same weights next time program is run
-        # np.random.seed(5)
+        np.random.seed(5)
         # random uniform initialization for weights
         self.weights_input_hidden1 = np.random.uniform(-1, 1, (self.input_dim, self.hidden1_dim))
         self.weights_hidden1_output = np.random.uniform(-1, 1, (self.hidden1_dim, self.output_dim))

@@ -1,4 +1,5 @@
 import numpy as np
+from scipy.special import softmax as scipy_softmax
 
 
 def relu(x):
@@ -44,7 +45,10 @@ def softmax(x):
     :param x: N length array
     :return: Softmax for ach value between 0-1, N length array
     """
-    return np.exp(x) / np.sum(np.exp(x), axis=0)
+    # print('x: {}'.format(x))
+    # this custom implementation gives overflow errors when used with momentum...
+    # np.exp(x) / np.sum(np.exp(x), axis=0)
+    return scipy_softmax(x)
 
 
 def softmax_bw(softmax_output, label):

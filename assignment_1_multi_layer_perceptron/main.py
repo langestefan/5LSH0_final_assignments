@@ -6,6 +6,7 @@ import network
 from math import floor
 import time
 
+
 # Some sources:
 # https://towardsdatascience.com/batch-mini-batch-stochastic-gradient-descent-7a62ecba642a
 # https://machinelearningmastery.com/gentle-introduction-mini-batch-gradient-descent-configure-batch-size/
@@ -46,6 +47,8 @@ def train():
     # we get 60000/64 = 937 minibatches with 60000%64 = 32 samples left
     one_hot_label = np.zeros(10, dtype=np.uint8)
 
+    vt_w_out_old, vt_b_out_old, vt_w_hidden_old, vt_b_hidden_old = 0, 0, 0, 0
+
     for batch_id, (mini_batch, label) in enumerate(train_data):
 
         sum_grad_w_hidden = np.zeros((network.input_dim, network.hidden1_dim))
@@ -83,13 +86,21 @@ def train():
         grad_w_hidden = sum_grad_w_hidden / batch_size_train
         grad_b_hidden = sum_grad_b_hidden / batch_size_train
 
-        # print('grad_b_output: {}'.format(grad_b_output))
+        # add momentum, see https://towardsdatascience.com/stochastic-gradient-descent-with-momentum-a84097641a5d
+        # vt = momentum * vt_old + LR * gradient
+        vt_w_out = momentum * vt_w_out_old + LR * grad_w_output
+        vt_b_out = momentum * vt_b_out_old + LR * grad_b_output
+        vt_w_hidden = momentum * vt_w_hidden_old + LR * grad_w_hidden
+        vt_b_hidden = momentum * vt_b_hidden_old + LR * grad_b_hidden
 
-        # update network
-        network.weights_hidden1_output = network.weights_hidden1_output - LR * grad_w_output
-        network.bias_output = network.bias_output - LR * grad_b_output
-        network.weights_input_hidden1 = network.weights_input_hidden1 - LR * grad_w_hidden
-        network.bias_hidden1 = network.bias_hidden1 - LR * grad_b_hidden
+        # store vt_old for use in next iteration
+        vt_w_out_old, vt_b_out_old, vt_w_hidden_old, vt_b_hidden_old = vt_w_out, vt_b_out, vt_w_hidden, vt_b_hidden
+
+        # update network parameters
+        network.weights_hidden1_output = network.weights_hidden1_output - vt_w_out
+        network.bias_output = network.bias_output - vt_b_out
+        network.weights_input_hidden1 = network.weights_input_hidden1 - vt_w_hidden
+        network.bias_hidden1 = network.bias_hidden1 - vt_b_hidden
 
         if batch_id % 100 == 0:
             print('Batch {0}: Loss: {1}'.format(batch_id, loss / batch_size_train))
@@ -136,9 +147,10 @@ if __name__ == '__main__':
     n_train_samples = 60000
     batch_size_train = 32
     batch_size_test = 1000
-    LR = 0.005
+    LR = 0.01
     n_mini_batch = floor(n_train_samples / batch_size_train)
     n_epochs = 10
+    momentum = 0.9
 
     # network settings
     network.input_dim = 28 * 28  # 784 pixels
