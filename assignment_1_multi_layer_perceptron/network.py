@@ -43,10 +43,10 @@ class Network:
         self.output_activation = np.zeros(self.output_dim)
 
         # bias
-        # self.bias_hidden1 = np.zeros(self.hidden1_dim)
-        # self.bias_output = np.zeros(self.output_dim)
-        self.bias_hidden1 = np.random.uniform(-1, 1, self.hidden1_dim)
-        self.bias_output = np.random.uniform(-1, 1, self.output_dim)
+        self.bias_hidden1 = np.zeros(self.hidden1_dim)
+        self.bias_output = np.zeros(self.output_dim)
+        # self.bias_hidden1 = np.random.uniform(-1, 1, self.hidden1_dim)
+        # self.bias_output = np.random.uniform(-1, 1, self.output_dim)
 
         # input
         self.pre_hidden1 = np.zeros(self.hidden1_dim)
@@ -71,9 +71,15 @@ class Network:
         """
         # to keep same weights next time program is run
         np.random.seed(5)
-        # random uniform initialization for weights
-        self.weights_input_hidden1 = np.random.uniform(-1, 1, (self.input_dim, self.hidden1_dim))
-        self.weights_hidden1_output = np.random.uniform(-1, 1, (self.hidden1_dim, self.output_dim))
+
+        # xavier weight initialization w ~ U(-1/sqrt(n), 1/sqrt(n))
+        w_h1 = 1/np.sqrt(self.input_dim)
+        w_o = 1/np.sqrt(self.hidden1_dim)
+
+        # random (xavier) uniform initialization for weights
+        self.weights_input_hidden1 = np.random.uniform(-w_h1, w_h1, (self.input_dim, self.hidden1_dim))
+        self.weights_hidden1_output = np.random.uniform(-w_o, w_o, (self.hidden1_dim, self.output_dim))
+
         print('Weights vector input-->hidden1: {0}'.format(self.weights_input_hidden1.shape))
         print('Weights vector hidden1-->output: {0}'.format(self.weights_hidden1_output.shape))
 
@@ -93,25 +99,14 @@ class Network:
         # 3. Softmax for the output layer
         # 4. Cross entropy for the loss layer
 
-        # input --> hidden layer 1
-        # TODO: compute as matrix multiplication: weight matrix*input
-        for node_id in range(self.hidden1_dim):
-            # node input = dotproduct of weights with input + bias
-            self.pre_hidden1[node_id] = np.dot(self.input, self.weights_input_hidden1[:, node_id]) + \
-                                        self.bias_hidden1[node_id]
-            # node output = activationF(input)
-            node_activ = activation.relu(self.pre_hidden1[node_id])
-            # print('node_activ: {}'.format(node_activ))
-            self.hidden1_activation[node_id] = node_activ
+        # input --> hidden layer 1 (ReLU)
+        # output = input_vector * weight_matrix  + bias_vector
+        # Y = XW + B
+        self.pre_hidden1 = np.matmul(self.input, self.weights_input_hidden1) + self.bias_hidden1
+        self.hidden1_activation = activation.relu(self.pre_hidden1)
 
-        # hidden layer 1 --> output
-        # TODO: compute as matrix multiplication: weight matrix*input
-        for node_id in range(self.output_dim):
-            # node input = dotproduct of weights with input + bias
-            self.pre_output[node_id] = np.dot(self.hidden1_activation, self.weights_hidden1_output[:, node_id]) + \
-                                       self.bias_output[node_id]
-
-        # apply softmax to output layer
+        # hidden layer 1 --> output (SoftMax)
+        self.pre_output = np.matmul(self.hidden1_activation, self.weights_hidden1_output) + self.bias_output
         self.output_activation = activation.softmax(self.pre_output)
 
         # after forward pass we return the loss using Cross Entropy loss function
@@ -120,8 +115,6 @@ class Network:
         # non-maximum supression on output vector
         result = np.zeros_like(self.output_activation, dtype=np.uint8)
         result[self.output_activation.argmax(0)] = 1
-
-        # print('result: {}'.format(result))
 
         return loss, result
 
