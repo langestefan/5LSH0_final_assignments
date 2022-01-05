@@ -70,12 +70,3 @@ def cross_entropy(predictions, label):
     ce = -np.dot(label, np.log(predictions + eps)) / n
     return ce
 
-
-# def cross_entropy_bw(predictions, labels):
-#     """
-#     Derivative of entropy with respect to the activation of the last layer
-#     :param predictions: Output from softmax layer
-#     :param labels: Labels, 1 if true, 0 if false
-#     :return: Derivative of CE: -1/x
-#     """
-#     return np.where(labels == 1, -1 / predictions, 0)

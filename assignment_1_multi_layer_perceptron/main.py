@@ -6,7 +6,6 @@ import network
 from math import floor
 import time
 
-
 # Some sources:
 # https://towardsdatascience.com/batch-mini-batch-stochastic-gradient-descent-7a62ecba642a
 # https://machinelearningmastery.com/gentle-introduction-mini-batch-gradient-descent-configure-batch-size/
@@ -25,7 +24,8 @@ def import_data(batch_size_train_s, batch_size_test_s):
     """
     transform = torchvision.transforms.Compose([
         torchvision.transforms.ToTensor(),
-        torchvision.transforms.Normalize((0.1307,), (0.3081,))])
+        torchvision.transforms.Normalize((0.1307,), (0.3081,))
+    ])
 
     train_d = torch.utils.data.DataLoader(
         datasets.MNIST('./data', train=True, download=True, transform=transform),
@@ -124,8 +124,8 @@ def test():
             total_n += 1
             one_hot_label[:] = 0
 
-    test_accuracy = (correct_n / total_n) * 100
-    return test_accuracy
+    t_accuracy = (correct_n / total_n) * 100
+    return t_accuracy
 
 
 if __name__ == '__main__':
@@ -136,13 +136,13 @@ if __name__ == '__main__':
     n_train_samples = 60000
     batch_size_train = 32
     batch_size_test = 1000
-    LR = 0.01
+    LR = 0.005
     n_mini_batch = floor(n_train_samples / batch_size_train)
     n_epochs = 10
 
     # network settings
     network.input_dim = 28 * 28  # 784 pixels
-    network.hidden1_dim = 300
+    network.hidden1_dim = 250
     network.output_dim = 10
 
     # init network
@@ -154,7 +154,7 @@ if __name__ == '__main__':
 
     # train
     for epoch in range(n_epochs):
-        print('~~~~ %s seconds ~~~~' % round(time.time() - start_time, 0))
+        print('~~~~ {} seconds ~~~~'.format(round(time.time() - start_time, 0)))
         print('Epoch: {}'.format(epoch))
         train()
 
