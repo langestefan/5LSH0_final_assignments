@@ -1,4 +1,5 @@
 import numpy as np
+# use scipy to avoid exponential overflow issue, not enough time to fix it in the custom implementation
 from scipy.special import softmax as scipy_softmax
 
 
@@ -70,7 +71,7 @@ def cross_entropy(predictions, label):
     :return: Cross-entropy
     """
     n = np.size(label)
-    eps = 1e-12
+    eps = 1e-12 # for numerical stability
     ce = -np.dot(label, np.log(predictions + eps)) / n
     return ce
 

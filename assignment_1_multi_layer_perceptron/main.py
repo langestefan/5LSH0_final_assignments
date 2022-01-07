@@ -7,14 +7,6 @@ from math import floor
 import time
 
 
-# Some sources:
-# https://towardsdatascience.com/batch-mini-batch-stochastic-gradient-descent-7a62ecba642a
-# https://machinelearningmastery.com/gentle-introduction-mini-batch-gradient-descent-configure-batch-size/
-# https://sgugger.github.io/a-simple-neural-net-in-numpy.html
-# https://stats.stackexchange.com/a/306710
-# https://www.youtube.com/watch?v=znqbtL0fRA0&ab_channel=MLDawn
-
-
 def import_data(batch_size_train_s, batch_size_test_s):
     """
     This function imports the MNIST dataset. This is the only function that makes use of pytorch, as per assignment
@@ -41,25 +33,24 @@ def import_data(batch_size_train_s, batch_size_test_s):
 
 def train():
     """
-    Traing the network
-    :return: N/A
+    Train the network for 1 epoch.
     """
-    # we get 60000/64 = 937 minibatches with 60000%64 = 32 samples left
+    print('Execute training')
     one_hot_label = np.zeros(10, dtype=np.uint8)
-
     vt_w_out_old, vt_b_out_old, vt_w_hidden_old, vt_b_hidden_old = 0, 0, 0, 0
 
+    # loop over all mini-batches
     for batch_id, (mini_batch, label) in enumerate(train_data):
 
         sum_grad_w_hidden = np.zeros((network.input_dim, network.hidden1_dim))
         sum_grad_w_output = np.zeros((network.hidden1_dim, network.output_dim))
         sum_grad_b_hidden = np.zeros(network.hidden1_dim)
         sum_grad_b_output = np.zeros(network.output_dim)
-
         loss = 0
 
+        # loop over all samples in mini-batch
         for sample_id, sample in enumerate(mini_batch):
-            # Flatten input, create 748, input vector
+            # Flatten input, create 748-dimension input vector
             flat_sample = (np.array(sample)).reshape((network.input_dim, 1))
 
             # Forward pass one sample to network
@@ -74,19 +65,17 @@ def train():
             sum_grad_w_hidden += w_hidden
             sum_grad_b_hidden += b_hidden
 
-            # print('sum_grad_w_output: {}'.format(sum_grad_w_output))
-
             # clear label at the end of each sample
             one_hot_label[:] = 0  # clear variable
 
-        # when we exit the for loop and have treated all samples in our minibatch, we average the update to our weights
-        # and update the final weights by this average
+        # average gradient over mini-batch
         grad_w_output = sum_grad_w_output / batch_size_train
         grad_b_output = sum_grad_b_output / batch_size_train
         grad_w_hidden = sum_grad_w_hidden / batch_size_train
         grad_b_hidden = sum_grad_b_hidden / batch_size_train
 
-        # add momentum, see https://towardsdatascience.com/stochastic-gradient-descent-with-momentum-a84097641a5d
+        # add momentum gradient descent
+        # see https://towardsdatascience.com/stochastic-gradient-descent-with-momentum-a84097641a5d
         # vt = momentum * vt_old + LR * gradient
         vt_w_out = momentum * vt_w_out_old + LR * grad_w_output
         vt_b_out = momentum * vt_b_out_old + LR * grad_b_output
@@ -102,8 +91,8 @@ def train():
         network.weights_input_hidden1 = network.weights_input_hidden1 - vt_w_hidden
         network.bias_hidden1 = network.bias_hidden1 - vt_b_hidden
 
-        if batch_id % 100 == 0:
-            print('Batch {0}: Loss: {1}'.format(batch_id, loss / batch_size_train))
+        # if batch_id % 100 == 0:
+        #     print('Batch {0}: Loss: {1}'.format(batch_id, loss / batch_size_train))
 
 
 def test():
@@ -111,6 +100,7 @@ def test():
     Run test batches on trained network
     :return: N/A
     """
+    print('Execute testing')
     one_hot_label = np.zeros(10, dtype=np.uint8)
     correct_n = 0
     total_n = 0
@@ -145,19 +135,23 @@ if __name__ == '__main__':
 
     # train settings
     n_train_samples = 60000
-    batch_size_train = 32
     batch_size_test = 1000
-    LR = 0.01
-    n_mini_batch = floor(n_train_samples / batch_size_train)
-    n_epochs = 10
+
+    batch_size_train = 16
+    LR = 0.001
+    n_epochs = 20
     momentum = 0.9
 
     # network settings
     network.input_dim = 28 * 28  # 784 pixels
-    network.hidden1_dim = 250
+    network.hidden1_dim = 128
     network.output_dim = 10
 
+    # set to True if using ReLU activation, set to False if using sigmoid
+    network.relu = True
+
     # init network
+    n_mini_batch = floor(n_train_samples / batch_size_train)
     network.init_neurons()
     network.init_weights()
 

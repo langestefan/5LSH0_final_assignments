@@ -132,3 +132,4 @@ dmypy.json
 reports
 .idea
 data/
+*.txt
