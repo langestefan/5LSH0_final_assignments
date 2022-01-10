@@ -9,8 +9,7 @@ import time
 import matplotlib.pyplot as plt
 import matplotlib
 
-
-from re_id import calculate_distances
+from re_id import re_id_query
 
 
 # network class
@@ -19,12 +18,12 @@ class Network(nn.Module):
         super(Network, self).__init__()
         # to store 2d feature vector results
         # store this in zip((x0,y0), label, prediction)
-        self.feature_vectors_test = []
+        # self.feature_vectors_test = []
         self.feature_vectors_points_test = np.zeros((0, 2))  # to store 2D feature vectors for testdata
         self.feature_vectors_labels_test = np.zeros((0, 1), dtype=np.int8)  # to store groundtruth for testdata
         self.feature_vectors_pred_test = np.zeros((0, 1), dtype=np.int8)  # to store prediction for testdata
 
-        self.feature_vectors_train = []
+        # self.feature_vectors_train = []
         self.feature_vectors_points_train = np.zeros((0, 2))  # to store 2D feature vectors for traindata
         self.feature_vectors_labels_train = np.zeros((0, 1), dtype=np.int8)  # to store groundtruth for traindata
         self.feature_vectors_pred_train = np.zeros((0, 1), dtype=np.int8)  # to store prediction for traindata
@@ -194,29 +193,42 @@ def test():
             else:
                 network.feature_vectors_pred_train = np.append(network.feature_vectors_pred_train, pred_label)
 
-            for idx, label in enumerate(labels):
+            for idd, label in enumerate(labels):
                 total_n[label] += 1
 
-                if pred_label[idx] == label:
+                if pred_label[idd] == label:
                     correct_n[label] += 1
 
         loss /= num_batches
 
         # compute correct/total for every digit
-        correct_frac = correct_n / total_n
+        correct_frac_digit = correct_n / total_n
+        correct_frac_avg = np.sum(correct_n) / np.sum(total_n)
 
-        print('Fraction correct for each label [0-9]: {}'.format(np.round(correct_frac, 3)))
-        print('Total test loss: {}'.format(np.round(loss, 5)))
+        print('Fraction correct for each label [0-9]: {}'.format(np.round(correct_frac_digit, 3)))
+        print('Fraction correct average: {}'.format(np.round(correct_frac_avg, 3)))
+        print('Average test loss: {}'.format(np.round(loss, 5)))
+
+
+def clear_variables():
+    network.feature_vectors_points_test = np.zeros((0, 2))  # to store 2D feature vectors for testdata
+    network.feature_vectors_labels_test = np.zeros((0, 1), dtype=np.int8)  # to store groundtruth for testdata
+    network.feature_vectors_pred_test = np.zeros((0, 1), dtype=np.int8)  # to store prediction for testdata
+
+    # self.feature_vectors_train = []
+    network.feature_vectors_points_train = np.zeros((0, 2))
+    network.feature_vectors_labels_train = np.zeros((0, 1), dtype=np.int8)
+    network.feature_vectors_pred_train = np.zeros((0, 1), dtype=np.int8)
 
 
 if __name__ == '__main__':
     # network settings
-    bs_test = 1000  # 1000
+    bs_test = 1000
 
     # hyperparameters
     LR = 0.01
     momentum = 0.9
-    n_epochs = 1
+    n_epochs = 20
     bs_train = 64
 
     # torch settings
@@ -228,7 +240,7 @@ if __name__ == '__main__':
 
     # create network object
     network = Network()
-    network.load_state_dict(torch.load('model.pth'))
+    # network.load_state_dict(torch.load('model.pth'))
     print(network)
 
     # optimizer for backpropagation
@@ -240,9 +252,10 @@ if __name__ == '__main__':
     # nn.CrossEntropyLoss combines nn.LogSoftmax and nn.NLLLoss.
     lossf = nn.CrossEntropyLoss()
 
-    # train
     for epoch in range(n_epochs):
         print('--- Epoch: {0} - {1} seconds ---'.format(epoch, round(time.time() - start_time, 0)))
+        clear_variables()  # clear 2d feature vectors
+
         # to hold sorted 2d feature vectors for plotting test data
         sorted_features_plot = np.zeros((10, 20, 2))
 
@@ -252,6 +265,9 @@ if __name__ == '__main__':
         # we test once without training, then we complete the epoch loop
         test()  # test updated model
 
+        # 1 training epoch
+        train()
+
         # print 2D feature vector of last N=<bs_test> test samples
         # a = network.feature_vectors_ground_truth_test
         # concatenate feature vectors and labels into a single np array so it's easy to search through
@@ -259,8 +275,8 @@ if __name__ == '__main__':
                                          axis=1)
 
         # zip 2D feature vectors (x0, y0) with pred and groudtruth labels (test)
-        network.feature_vectors_test = zip(network.feature_vectors_points_test, network.feature_vectors_labels_test,
-                                           network.feature_vectors_pred_test)
+        feature_vectors_test = zip(network.feature_vectors_points_test, network.feature_vectors_labels_test,
+                                   network.feature_vectors_pred_test)
 
         # sort data by label for plotting
         for id_x in range(10):
@@ -268,9 +284,6 @@ if __name__ == '__main__':
 
         # plot 2D feature embedding space of test data
         # plot(sorted_features_plot)
-
-        # 1 training epoch
-        train()
 
         # get predictions for our gallery data
         # test_data_copy = test_data
@@ -280,14 +293,30 @@ if __name__ == '__main__':
         # test_data = test_data_copy
 
         # zip 2D feature vectors (x0, y0) with groudtruth labels (train)
-        network.feature_vectors_test = zip(network.feature_vectors_points_train, network.feature_vectors_labels_train,
-                                           network.feature_vectors_pred_train)
+        feature_vectors_train = zip(network.feature_vectors_points_train, network.feature_vectors_labels_train)
 
-        # calculate distances
-        distances = calculate_distances(network.feature_vectors_points_train, network.feature_vectors_points_test[0])
+        # get top k = k_re_id performance
+        n_correct_re_id = 0
+        k_re_id = 20
+        n_queries = 30
 
-        print(distances)
+        # 100 queries or all queries? All queries = 10.000 * 60.000 = 6*10^8 distance calculations, way too many!
+        print('--- start re-identification ---')
+        results = re_id_query(network.feature_vectors_points_test[:n_queries, :], feature_vectors_train, k_re_id)
+        # results = re_id_query(network.feature_vectors_points_test, feature_vectors_train, k_re_id)
 
-        # generate gallery = train set with predicted labels
-        # for i, (x0, y0, predlabel) in enumerate(network.feature_vectors_prediction_test):
-        #     print(i, x0, y0, predlabel)
+        # To measure the re-ID performance, you can use the training set of the MNIST dataset as the gallery
+        # and its test set as the query set. Then, for each query (10.000?):
+        #  - determine its feature vector distance to each gallery image (60.000)
+        #  - Rank the 20 most-similar gallery images to determine the fraction of gallery images
+        #  - Determine the number of correct digit, i.e. the top-20 re-ID performance.
+
+        for iddx in range(n_queries):
+            query_true_label = network.feature_vectors_labels_test[iddx]
+
+            # count how often the true label occurs in the return result
+            assigned = results[iddx][:, 2]
+            n_correct_re_id += np.count_nonzero(assigned == query_true_label)
+
+        re_id_accuracy = np.round(n_correct_re_id / (n_queries * k_re_id), 3)
+        print('Re-identification accuracy: {0}'.format(re_id_accuracy))
