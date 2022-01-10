@@ -19,5 +19,11 @@ def calculate_distances(data, point):
     return distance
 
 
-# def query(point, data, n_results):
-#     """
+def query(queries, gallery, n_results):
+    """
+
+    :param queries: Array(N,2) of points we want to query
+    :param gallery:
+    :param n_results:
+    :return:
+    """

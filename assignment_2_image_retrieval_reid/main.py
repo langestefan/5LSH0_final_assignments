@@ -8,7 +8,9 @@ import numpy as np
 import time
 import matplotlib.pyplot as plt
 import matplotlib
-# from re_id import query
+
+
+from re_id import calculate_distances
 
 
 # network class
@@ -16,11 +18,18 @@ class Network(nn.Module):
     def __init__(self):
         super(Network, self).__init__()
         # to store 2d feature vector results
-        self.feature_vectors_ground_truth_test = np.zeros((bs_test, 3))
-        self.feature_vectors_prediction_test = np.zeros((bs_test, 3))
+        # store this in zip((x0,y0), label, prediction)
+        self.feature_vectors_test = []
+        self.feature_vectors_points_test = np.zeros((0, 2))  # to store 2D feature vectors for testdata
+        self.feature_vectors_labels_test = np.zeros((0, 1), dtype=np.int8)  # to store groundtruth for testdata
+        self.feature_vectors_pred_test = np.zeros((0, 1), dtype=np.int8)  # to store prediction for testdata
 
-        self.feature_vectors_train = []  # np.zeros((0, 3))
-        self.train_labels = []
+        self.feature_vectors_train = []
+        self.feature_vectors_points_train = np.zeros((0, 2))  # to store 2D feature vectors for traindata
+        self.feature_vectors_labels_train = np.zeros((0, 1), dtype=np.int8)  # to store groundtruth for traindata
+        self.feature_vectors_pred_train = np.zeros((0, 1), dtype=np.int8)  # to store prediction for traindata
+
+        self.testing_train_data = False
 
         # layer conv1
         self.conv1 = nn.Sequential(
@@ -66,14 +75,9 @@ class Network(nn.Module):
 
         # Store 2D vector result for use with re-id later
         if not self.training:
-            self.feature_vectors_ground_truth_test[:, 0:2] = x
-            self.feature_vectors_prediction_test[:, 0:2] = x
-
-        if self.training:
-            self.feature_vectors_train.append(x.detach().numpy())
-            # print('2d_vectors_train: {0}'.format(self.feature_vectors_train))
-            # print('2d_vectors_train: {0}'.format(type(self.feature_vectors_train)))
-            # print('2d_vectors_train: {0}'.format(np.shape(self.feature_vectors_train)))
+            self.feature_vectors_points_test = np.append(self.feature_vectors_points_test, x.numpy(), axis=0)
+        else:
+            self.feature_vectors_points_train = np.append(self.feature_vectors_points_train, x.detach().numpy(), axis=0)
 
         x = self.fc2(x)
         return x
@@ -83,13 +87,11 @@ class Network(nn.Module):
 def plot(all_points):
     """
     Plot function from assignment document
-    :param all_points:
-    :return:
+    :param all_points: (digits, points, (x0, y0)) = (10, 20, 2)
     """
     colors = matplotlib.cm.Paired(np.linspace(0, 1, len(all_points)))
     fig, ax = plt.subplots(figsize=(7, 5))
     for (points, color, digit) in zip(all_points, colors, range(10)):
-        # print('points: {0}, color: {1}, digit: {2}'.format(points, color, digit))
         ax.scatter([item[0] for item in points],
                    [item[1] for item in points],
                    color=color, label='digit{}'.format(digit))
@@ -131,18 +133,18 @@ def train():
     print('--- start training ---')
     network.train()
     size = len(train_data.dataset)
-    network.train_labels = []
 
     # loop over all mini-batches
     for batch_id, (mini_batch, tlabel) in enumerate(train_data):
-        network.train_labels.append(tlabel.numpy())  # save training labels
-        # print('train_labels: {0}'.format(np.shape(train_labels)))
+        # save training labels
+        network.feature_vectors_labels_train = np.append(network.feature_vectors_labels_train,
+                                                         np.transpose([tlabel.numpy()]), axis=0)
+
         # we input our data in N = <bs_train> samples at a time
         output = network(mini_batch)
-        # compute loss
-        loss = lossf(output, tlabel)
-        # make sure old gradients are set to 0 before the next step
-        optimizer.zero_grad()
+        loss = lossf(output, tlabel)  # compute loss
+        optimizer.zero_grad()  # make sure old gradients are set to 0 before the next step
+
         # backpropagation
         loss.backward()
         optimizer.step()
@@ -177,7 +179,8 @@ def test():
     # with .no_grad() we make sure pytorch does not perform backprogation/gradient calculations
     with torch.no_grad():
         for data, labels in test_data:
-            network.feature_vectors_ground_truth_test[:, 2] = labels  # store groundtruth
+            network.feature_vectors_labels_test = np.append(network.feature_vectors_labels_test,
+                                                            np.transpose([labels.numpy()]), axis=0)
 
             output = network(data)
             loss += lossf(output, labels).item()
@@ -185,7 +188,11 @@ def test():
             # check if digit was correctly classified
             pred_label = torch.max(output, 1)[1].data.squeeze()
 
-            network.feature_vectors_prediction_test[:, 2] = pred_label
+            # store predicted labels
+            if not network.testing_train_data:
+                network.feature_vectors_pred_test = np.append(network.feature_vectors_pred_test, pred_label)
+            else:
+                network.feature_vectors_pred_train = np.append(network.feature_vectors_pred_train, pred_label)
 
             for idx, label in enumerate(labels):
                 total_n[label] += 1
@@ -204,7 +211,7 @@ def test():
 
 if __name__ == '__main__':
     # network settings
-    bs_test = 10000  # 1000
+    bs_test = 1000  # 1000
 
     # hyperparameters
     LR = 0.01
@@ -236,8 +243,7 @@ if __name__ == '__main__':
     # train
     for epoch in range(n_epochs):
         print('--- Epoch: {0} - {1} seconds ---'.format(epoch, round(time.time() - start_time, 0)))
-        # to hold 2d feature vectors for TEST DATA
-        sorted_features = []
+        # to hold sorted 2d feature vectors for plotting test data
         sorted_features_plot = np.zeros((10, 20, 2))
 
         # to hold gallery images array(60000, 3) = (x0, y0, digit)
@@ -247,33 +253,41 @@ if __name__ == '__main__':
         test()  # test updated model
 
         # print 2D feature vector of last N=<bs_test> test samples
-        a = network.feature_vectors_ground_truth_test
+        # a = network.feature_vectors_ground_truth_test
+        # concatenate feature vectors and labels into a single np array so it's easy to search through
+        pts_labels_test = np.concatenate((network.feature_vectors_points_test, network.feature_vectors_labels_test),
+                                         axis=1)
+
+        # zip 2D feature vectors (x0, y0) with pred and groudtruth labels (test)
+        network.feature_vectors_test = zip(network.feature_vectors_points_test, network.feature_vectors_labels_test,
+                                           network.feature_vectors_pred_test)
+
+        # sort data by label for plotting
         for id_x in range(10):
-            sorted_features.append(a[np.where(a[:, 2] == id_x)][:, :2])  # to store the data in a convenient way
-            sorted_features_plot[id_x] = a[np.where(a[:, 2] == id_x)][:20, :2]  # to hold just the data for plotting
+            sorted_features_plot[id_x] = pts_labels_test[np.where(pts_labels_test[:, 2] == id_x)][:20, :2]
 
         # plot 2D feature embedding space of test data
-        plot(sorted_features_plot)
+        # plot(sorted_features_plot)
 
         # 1 training epoch
         train()
 
+        # get predictions for our gallery data
+        # test_data_copy = test_data
+        # test_data = train_data  # test data is now our entire training data set
+        # network.testing_train_data = True
+        # test()  # run a test with training data as test data
+        # test_data = test_data_copy
+
+        # zip 2D feature vectors (x0, y0) with groudtruth labels (train)
+        network.feature_vectors_test = zip(network.feature_vectors_points_train, network.feature_vectors_labels_train,
+                                           network.feature_vectors_pred_train)
+
+        # calculate distances
+        distances = calculate_distances(network.feature_vectors_points_train, network.feature_vectors_points_test[0])
+
+        print(distances)
+
         # generate gallery = train set with predicted labels
-
-        for i, (x0, y0, predlabel) in enumerate(network.feature_vectors_prediction_test):
-            print(i, x0, y0, predlabel)
-
-        # do re-id query
-        # query = test set
-        # gallery = train set
-
-        # reshape self.feature_vectors_train into (60000,3) np array
-        # then array[:,3] = train_labels[:]
-        # self.feature_vectors_train
-
-        # for idx, d_list in enumerate(sorted_features):
-        #     print(idx)
-        #     print(np.shape(d_list))
-        #
-        #     results = query((d_list[0], d_list[1]), )
-
+        # for i, (x0, y0, predlabel) in enumerate(network.feature_vectors_prediction_test):
+        #     print(i, x0, y0, predlabel)
