@@ -133,3 +133,5 @@ reports
 .idea
 data/
 *.txt
+processed
+handwritten

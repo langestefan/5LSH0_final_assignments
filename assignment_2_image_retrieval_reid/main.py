@@ -118,7 +118,7 @@ def import_data(batch_size_train_s, batch_size_test_s):
 
     test_d = torch.utils.data.DataLoader(
         datasets.MNIST('./data', train=False, download=True, transform=transform),
-        batch_size=batch_size_test_s, shuffle=False)  # shuffle to false to track points over epochs
+        batch_size=batch_size_test_s, shuffle=True)  # shuffle to false to track points over epochs
 
     return train_d, test_d
 
@@ -135,23 +135,41 @@ def train():
 
     # loop over all mini-batches
     for batch_id, (mini_batch, tlabel) in enumerate(train_data):
+
+        correct_n = 0
+        total_n = 0
+
         # save training labels
         network.feature_vectors_labels_train = np.append(network.feature_vectors_labels_train,
                                                          np.transpose([tlabel.numpy()]), axis=0)
 
         # we input our data in N = <bs_train> samples at a time
         output = network(mini_batch)
-        loss = lossf(output, tlabel)  # compute loss
+        train_loss = lossf(output, tlabel)  # compute train_loss
         optimizer.zero_grad()  # make sure old gradients are set to 0 before the next step
 
         # backpropagation
-        loss.backward()
+        train_loss.backward()
         optimizer.step()
 
         if batch_id % 100 == 0:
-            loss = loss.item()
+            train_loss = train_loss.item()
             current = batch_id * len(mini_batch)
-            print(f"loss: {loss:>7f}  [{current:>5d}/{size:>5d}]")
+            print('train loss: {:f}   [{}/{}]'.format(np.round(train_loss, 5), current, size))
+
+        # check if digit was correctly classified
+        pred_label = torch.max(output, 1)[1].data.squeeze()
+
+        # compute train batch accuracy
+        for idd, label in enumerate(tlabel):
+            if pred_label[idd] == label:
+                correct_n += 1
+
+        # batch accuracy/loss for report
+        # batch_accuracy = correct_n/bs_train
+        # train_loss = train_loss.item()
+        # current = batch_id * len(mini_batch)
+        # print('{:f}, {:f}, {:d}'.format(np.round(train_loss, 5), np.round(batch_accuracy, 5), int(current/64)))
 
     # save network state after each training epoch
     # torch.save(network.state_dict(), 'model.pth')
@@ -165,9 +183,8 @@ def test():
     https://pytorch.org/tutorials/beginner/basics/optimization_tutorial.html
     """
     print('--- start test ---')
-    size = len(test_data.dataset)
-    num_batches = len(test_data)
-    loss = 0
+    n_batches = len(test_data)
+    test_loss = 0
 
     correct_n = np.zeros([10])  # we store correct_n for each digit individually
     total_n = np.zeros([10])
@@ -182,7 +199,7 @@ def test():
                                                             np.transpose([labels.numpy()]), axis=0)
 
             output = network(data)
-            loss += lossf(output, labels).item()
+            test_loss += lossf(output, labels).item()
 
             # check if digit was correctly classified
             pred_label = torch.max(output, 1)[1].data.squeeze()
@@ -199,18 +216,22 @@ def test():
                 if pred_label[idd] == label:
                     correct_n[label] += 1
 
-        loss /= num_batches
+        # compute average loss by taking the sum over the loss per batch and divide by number of batches
+        test_loss /= n_batches
 
         # compute correct/total for every digit
         correct_frac_digit = correct_n / total_n
         correct_frac_avg = np.sum(correct_n) / np.sum(total_n)
 
-        print('Fraction correct for each label [0-9]: {}'.format(np.round(correct_frac_digit, 3)))
-        print('Fraction correct average: {}'.format(np.round(correct_frac_avg, 3)))
-        print('Average test loss: {}'.format(np.round(loss, 5)))
+        print('Classification accuracy per label [0-9]: {}'.format(np.round(correct_frac_digit, 3)))
+        print('Classification accuracy average   [0-9]: [{}]'.format(np.round(correct_frac_avg, 3)))
+        print('Average test loss: [{}]'.format(np.round(test_loss, 5)))
 
 
 def clear_variables():
+    """
+    clear persistent variables
+    """
     network.feature_vectors_points_test = np.zeros((0, 2))  # to store 2D feature vectors for testdata
     network.feature_vectors_labels_test = np.zeros((0, 1), dtype=np.int8)  # to store groundtruth for testdata
     network.feature_vectors_pred_test = np.zeros((0, 1), dtype=np.int8)  # to store prediction for testdata
@@ -228,7 +249,7 @@ if __name__ == '__main__':
     # hyperparameters
     LR = 0.01
     momentum = 0.9
-    n_epochs = 20
+    n_epochs = 10
     bs_train = 64
 
     # torch settings
@@ -240,14 +261,16 @@ if __name__ == '__main__':
 
     # create network object
     network = Network()
+
+    # uncomment this line if we want to execute from pre-trained model
     # network.load_state_dict(torch.load('model.pth'))
     print(network)
 
     # optimizer for backpropagation
     optimizer = optim.SGD(network.parameters(), lr=LR, momentum=momentum)
-    # print(optimizer)
 
-    start_time = time.time()  # to keep track of runtime
+    # to keep track of runtime
+    start_time = time.time()
 
     # nn.CrossEntropyLoss combines nn.LogSoftmax and nn.NLLLoss.
     lossf = nn.CrossEntropyLoss()
@@ -259,17 +282,12 @@ if __name__ == '__main__':
         # to hold sorted 2d feature vectors for plotting test data
         sorted_features_plot = np.zeros((10, 20, 2))
 
-        # to hold gallery images array(60000, 3) = (x0, y0, digit)
-        gallery = np.zeros((0, 2))
-
         # we test once without training, then we complete the epoch loop
         test()  # test updated model
 
         # 1 training epoch
         train()
 
-        # print 2D feature vector of last N=<bs_test> test samples
-        # a = network.feature_vectors_ground_truth_test
         # concatenate feature vectors and labels into a single np array so it's easy to search through
         pts_labels_test = np.concatenate((network.feature_vectors_points_test, network.feature_vectors_labels_test),
                                          axis=1)
@@ -285,31 +303,19 @@ if __name__ == '__main__':
         # plot 2D feature embedding space of test data
         # plot(sorted_features_plot)
 
-        # get predictions for our gallery data
-        # test_data_copy = test_data
-        # test_data = train_data  # test data is now our entire training data set
-        # network.testing_train_data = True
-        # test()  # run a test with training data as test data
-        # test_data = test_data_copy
-
         # zip 2D feature vectors (x0, y0) with groudtruth labels (train)
         feature_vectors_train = zip(network.feature_vectors_points_train, network.feature_vectors_labels_train)
 
         # get top k = k_re_id performance
         n_correct_re_id = 0
         k_re_id = 20
-        n_queries = 30
+        n_queries = 100
 
+        # Determine the number of correct digit, i.e. the top-20 re-ID performance.
         # 100 queries or all queries? All queries = 10.000 * 60.000 = 6*10^8 distance calculations, way too many!
         print('--- start re-identification ---')
         results = re_id_query(network.feature_vectors_points_test[:n_queries, :], feature_vectors_train, k_re_id)
-        # results = re_id_query(network.feature_vectors_points_test, feature_vectors_train, k_re_id)
-
-        # To measure the re-ID performance, you can use the training set of the MNIST dataset as the gallery
-        # and its test set as the query set. Then, for each query (10.000?):
-        #  - determine its feature vector distance to each gallery image (60.000)
-        #  - Rank the 20 most-similar gallery images to determine the fraction of gallery images
-        #  - Determine the number of correct digit, i.e. the top-20 re-ID performance.
+        # results = re_id_query(network.feature_vectors_points_test, feature_vectors_train, k_re_id)  # all test points
 
         for iddx in range(n_queries):
             query_true_label = network.feature_vectors_labels_test[iddx]
@@ -319,4 +325,4 @@ if __name__ == '__main__':
             n_correct_re_id += np.count_nonzero(assigned == query_true_label)
 
         re_id_accuracy = np.round(n_correct_re_id / (n_queries * k_re_id), 3)
-        print('Re-identification accuracy: {0}'.format(re_id_accuracy))
+        print('Re-identification top-20 accuracy: [{0}]'.format(re_id_accuracy))
