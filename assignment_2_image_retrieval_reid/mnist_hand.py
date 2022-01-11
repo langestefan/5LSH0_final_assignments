@@ -19,11 +19,10 @@ brightness = -220
 img_28 = cv2.addWeighted(img_28, contrast, img_28, 0, brightness)
 
 # show enhanced image
-cv2.imshow("Resized image", img_28)
+cv2.imshow("img_28", img_28)
 cv2.waitKey(0)
 cv2.destroyAllWindows()
 
 # write image to folder
-print('Resized Dimensions : ', img_28.shape)
 cv2.imwrite("processed/" + str(digit) + ".png", img_28)
 

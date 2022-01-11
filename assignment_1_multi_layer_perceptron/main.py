@@ -11,6 +11,9 @@ def import_data(batch_size_train_s, batch_size_test_s):
     """
     This function imports the MNIST dataset. This is the only function that makes use of pytorch, as per assignment
     requirements: "You are allowed to load the MNIST dataset in any way of your choice."
+
+    !!!!!!!!!!!!!!data loader is not allowed, shuffling and batching must be implemented yourself!!!!!!!!!!!!
+    use dataset instead
     :param batch_size_train_s: Batch size for training
     :param batch_size_test_s: Batch size for testing
     :return: Train/test data objects

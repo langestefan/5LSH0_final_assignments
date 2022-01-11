@@ -8,6 +8,8 @@ import numpy as np
 import time
 import matplotlib.pyplot as plt
 import matplotlib
+import os
+import cv2
 
 from re_id import re_id_query
 
@@ -242,6 +244,68 @@ def clear_variables():
     network.feature_vectors_pred_train = np.zeros((0, 1), dtype=np.int8)
 
 
+def test_handwritten(handwritten_image_dir):
+    """
+    Run our handwritten digits throught the (trained) network
+    :param handwritten_image_dir: Directory where the handwritten images are stored
+    :return:
+    """
+    image_list = os.listdir(handwritten_image_dir)
+    np_img_arr = np.zeros((0, 1, 28, 28), dtype=np.double)
+
+    with torch.no_grad():
+        for file_name in image_list:
+            file_loc = os.path.join(handwritten_image_dir, file_name)
+
+            image = cv2.imread(file_loc, cv2.IMREAD_GRAYSCALE)
+            image_arr = np.array(image)
+            # print(np.shape(image_arr))  # (28, 28)
+            # print(image_arr)
+
+            np_img_arr = np.append(np_img_arr, [[image_arr]], axis=0)
+
+        torch_input_arr = torch.tensor(np_img_arr)
+        torch_input_arr = torch_input_arr.to(torch.float)
+        labels_hw = np.transpose([np.linspace(0, 9, num=10, dtype=np.int8)])
+        print(np.shape(labels_hw))
+
+        # Make sure entire network is enabled and in test mode via .eval()
+        network.eval()
+
+        # check if digit was correctly classified
+        output = network(torch_input_arr)
+        pred_label = torch.max(output, 1)[1].data.squeeze().numpy()
+        print('pred_label: {}'.format(pred_label))
+
+        print('--- start re-identification handwritten digits ---')
+        print(np.shape(network.feature_vectors_points_test))
+
+        # zip 2D feature vectors (x0, y0) with pred and groudtruth labels (test)
+        # feature_vectors_test_hw = zip(network.feature_vectors_points_test, labels_hw)
+
+        feature_vectors_train_hw = zip(network.feature_vectors_points_train, network.feature_vectors_labels_train)
+
+        # network.feature_vectors_points_test
+        results_hw = re_id_query(network.feature_vectors_points_test, feature_vectors_train_hw, 5)
+
+        print('results_hw: {}'.format(np.shape(results_hw)))
+
+        n_correct_re_id_hw = 0
+        n_queries_hw = 10
+        k_re_id_hw = 5
+
+        for ii in range(n_queries_hw):
+            query_true_label_hw = ii
+
+            # count how often the true label occurs in the return result
+            assigned_hw = results_hw[ii][:, 2]
+            print('assigned_hw: {}'.format(assigned_hw))
+            n_correct_re_id_hw += np.count_nonzero(assigned_hw == query_true_label_hw)
+
+        re_id_accuracy_hw = np.round(n_correct_re_id_hw / (n_queries_hw * k_re_id_hw), 3)
+        print('Re-id handwritten top-5 accuracy: [{0}]'.format(re_id_accuracy_hw))
+
+
 if __name__ == '__main__':
     # network settings
     bs_test = 1000
@@ -263,7 +327,7 @@ if __name__ == '__main__':
     network = Network()
 
     # uncomment this line if we want to execute from pre-trained model
-    # network.load_state_dict(torch.load('model.pth'))
+    network.load_state_dict(torch.load('model.pth'))
     print(network)
 
     # optimizer for backpropagation
@@ -277,16 +341,20 @@ if __name__ == '__main__':
 
     for epoch in range(n_epochs):
         print('--- Epoch: {0} - {1} seconds ---'.format(epoch, round(time.time() - start_time, 0)))
-        clear_variables()  # clear 2d feature vectors
 
         # to hold sorted 2d feature vectors for plotting test data
         sorted_features_plot = np.zeros((10, 20, 2))
 
         # we test once without training, then we complete the epoch loop
         test()  # test updated model
+        clear_variables()  # clear 2d feature vectors
 
         # 1 training epoch
         train()
+
+        # test handwritten MNIST digits
+        test_handwritten('processed')
+        clear_variables()  # clear 2d feature vectors
 
         # concatenate feature vectors and labels into a single np array so it's easy to search through
         pts_labels_test = np.concatenate((network.feature_vectors_points_test, network.feature_vectors_labels_test),

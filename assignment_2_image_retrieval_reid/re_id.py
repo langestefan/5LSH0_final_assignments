@@ -1,5 +1,6 @@
 import numpy as np
 from scipy.spatial.distance import euclidean
+from scipy.spatial.distance import cdist as cdist
 
 
 def calculate_distances(data, point):
@@ -16,7 +17,6 @@ def calculate_distances(data, point):
         # distance[idx] = euclidean(point, sample)
         distance[idx] = np.linalg.norm(point - sample)
 
-    # print('distance', np.shape(distance))
     return distance
 
 
@@ -28,9 +28,16 @@ def re_id_query(queries, gallery, n_results=20):
     :param n_results: number N closest points to given query
     :return: Array(n_queries, n_results). Labels for N = <n_results> from gallery ranked by distance to query points
     """
+    print('queries: {0}'.format(np.shape(queries)))
+    print('gallery: {0}'.format(np.shape(gallery)))
+
     gallery_points, gallery_labels = zip(*gallery)
     n_queries = np.shape(queries)[0]
     results = []
+
+    distances_cdist = cdist(gallery_points, queries)
+    print('distances_cdist: {0}'.format(np.shape(distances_cdist)))
+    print('distances_cdist: {0}'.format(distances_cdist))
 
     for idx, query in enumerate(queries):
         # calculate distance between query and all gallery points
@@ -46,4 +53,6 @@ def re_id_query(queries, gallery, n_results=20):
         if idx % 10 == 0:
             print('Query: [{0}/{1}]'.format(idx, n_queries))
 
+    print('results: {0}'.format(np.shape(results)))
+    print('results: {0}'.format(results))
     return results
