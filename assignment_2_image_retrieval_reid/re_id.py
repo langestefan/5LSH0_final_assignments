@@ -20,39 +20,31 @@ def calculate_distances(data, point):
     return distance
 
 
-def re_id_query(queries, gallery, n_results=20):
+def re_id_query(queries, q_labels, gallery, g_labels, top_k):
     """
     Do re-id query between all input queries and all input gallery samples
+    :param g_labels: Query labels
+    :param q_labels: Gallery labels
+    :param top_k: Closest top_k number of points we want to use for re-id
     :param queries: Array(N,2) of points we want to query, UNKNOWN labels
     :param gallery: All points, KNOWN labels
-    :param n_results: number N closest points to given query
     :return: Array(n_queries, n_results). Labels for N = <n_results> from gallery ranked by distance to query points
     """
-    print('queries: {0}'.format(np.shape(queries)))
-    print('gallery: {0}'.format(np.shape(gallery)))
-
-    gallery_points, gallery_labels = zip(*gallery)
+    n_correct_re_id = 0
     n_queries = np.shape(queries)[0]
-    results = []
 
-    distances_cdist = cdist(gallery_points, queries)
-    print('distances_cdist: {0}'.format(np.shape(distances_cdist)))
-    print('distances_cdist: {0}'.format(distances_cdist))
+    # compute distance between each gallery image and each query
+    print('--- compute re-identification distance matrix ---')
+    distance_matrix = cdist(gallery, queries)
 
-    for idx, query in enumerate(queries):
-        # calculate distance between query and all gallery points
-        distances = calculate_distances(gallery_points, query)
+    # get the indices of the topk lowest distances per query
+    topk_ind = np.argpartition(distance_matrix, top_k, axis=0)[:top_k, :]
 
-        # concatenate distance and labels in an array so we can easily sort it
-        combined = np.concatenate((gallery_points, gallery_labels, distances), axis=1)
+    # get the labels belonging to the topk gallery images
+    for index in range(np.shape(queries)[0]):
+        topk_gallery_labels = g_labels[topk_ind[:, index]]
+        n_correct_re_id += np.count_nonzero(q_labels[index] == topk_gallery_labels)
 
-        # order the array by distance (smallest --> largest) and keep only the smallest N=<n_results> rows
-        d_sorted = combined[combined[:, 3].argsort()][:n_results, :]
-        results.append(d_sorted)
+    re_id_accuracy = n_correct_re_id / (top_k * n_queries)
 
-        if idx % 10 == 0:
-            print('Query: [{0}/{1}]'.format(idx, n_queries))
-
-    print('results: {0}'.format(np.shape(results)))
-    print('results: {0}'.format(results))
-    return results
+    return re_id_accuracy, topk_ind

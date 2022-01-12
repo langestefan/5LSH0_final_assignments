@@ -21,16 +21,17 @@ class Network(nn.Module):
         # to store 2d feature vector results
         # store this in zip((x0,y0), label, prediction)
         # self.feature_vectors_test = []
-        self.feature_vectors_points_test = np.zeros((0, 2))  # to store 2D feature vectors for testdata
-        self.feature_vectors_labels_test = np.zeros((0, 1), dtype=np.int8)  # to store groundtruth for testdata
-        self.feature_vectors_pred_test = np.zeros((0, 1), dtype=np.int8)  # to store prediction for testdata
+        self.feature_vectors_test = np.zeros((0, 2))  # to store 2D feature vectors for testdata
+        self.labels_test = np.zeros((0, 1), dtype=np.int8)  # to store groundtruth for testdata
+        self.pred_test = np.zeros((0, 1), dtype=np.int8)  # to store prediction for testdata
 
         # self.feature_vectors_train = []
-        self.feature_vectors_points_train = np.zeros((0, 2))  # to store 2D feature vectors for traindata
-        self.feature_vectors_labels_train = np.zeros((0, 1), dtype=np.int8)  # to store groundtruth for traindata
-        self.feature_vectors_pred_train = np.zeros((0, 1), dtype=np.int8)  # to store prediction for traindata
+        self.feature_vectors_train = np.zeros((0, 2))  # to store 2D feature vectors for traindata
+        self.labels_train = np.zeros((0, 1), dtype=np.int8)  # to store groundtruth for traindata
+        self.pred_train = np.zeros((0, 1), dtype=np.int8)  # to store prediction for traindata
 
         self.testing_train_data = False
+        self.complete_train_dataset = torch.empty((0, 1, 28, 28))
 
         # layer conv1
         self.conv1 = nn.Sequential(
@@ -75,28 +76,36 @@ class Network(nn.Module):
         x = self.conv3(x)
 
         # Store 2D vector result for use with re-id later
-        if not self.training:
-            self.feature_vectors_points_test = np.append(self.feature_vectors_points_test, x.numpy(), axis=0)
+        if not self.training and not self.testing_train_data:
+            self.feature_vectors_test = np.append(self.feature_vectors_test, x.detach().numpy(), axis=0)
         else:
-            self.feature_vectors_points_train = np.append(self.feature_vectors_points_train, x.detach().numpy(), axis=0)
+            self.feature_vectors_train = np.append(self.feature_vectors_train, x.detach().numpy(), axis=0)
 
         x = self.fc2(x)
         return x
 
 
 # Plot and show
-def plot(all_points):
+def plot(mnist_points, hw_points):
     """
     Plot function from assignment document
-    :param all_points: (digits, points, (x0, y0)) = (10, 20, 2)
+    :param hw_points: Handwritten data feature vectors (digits, points, (x0, y0)) = (10, 1, 2)
+    :param mnist_points: MNIST feature vectors (digits, points, (x0, y0)) = (10, 20, 2)
     """
-    colors = matplotlib.cm.Paired(np.linspace(0, 1, len(all_points)))
+    colors = matplotlib.cm.Paired(np.linspace(0, 1, len(mnist_points)))
     fig, ax = plt.subplots(figsize=(7, 5))
-    for (points, color, digit) in zip(all_points, colors, range(10)):
+
+    for (points, color, digit) in zip(mnist_points, colors, range(10)):
         ax.scatter([item[0] for item in points],
                    [item[1] for item in points],
                    color=color, label='digit{}'.format(digit))
-        ax.grid(True)
+
+    for (point, color, digit) in zip(hw_points, colors, range(10)):
+        ax.scatter([item[0] for item in point],
+                   [item[1] for item in point],
+                   color=color, marker='s')
+
+    ax.grid(True)
     ax.legend()
     plt.show()
 
@@ -116,13 +125,23 @@ def import_data(batch_size_train_s, batch_size_test_s):
 
     train_d = torch.utils.data.DataLoader(
         datasets.MNIST('./data', train=True, download=True, transform=transform),
-        batch_size=batch_size_train_s, shuffle=True)
+        batch_size=batch_size_train_s, shuffle=False)
+        # batch_size=batch_size_train_s, shuffle = true)
 
     test_d = torch.utils.data.DataLoader(
         datasets.MNIST('./data', train=False, download=True, transform=transform),
-        batch_size=batch_size_test_s, shuffle=True)  # shuffle to false to track points over epochs
+        batch_size=batch_size_test_s, shuffle=False)  # shuffle to false to track points over epochs
 
     return train_d, test_d
+
+
+def concatenate_dataset():
+    """
+    To concatenate all training/testdata
+    """
+    # loop over all mini-batches
+    for batch_id, (mini_batch, tlabel) in enumerate(train_data):
+        network.complete_train_dataset = torch.cat((network.complete_train_dataset, mini_batch), dim=0)
 
 
 def train():
@@ -137,13 +156,12 @@ def train():
 
     # loop over all mini-batches
     for batch_id, (mini_batch, tlabel) in enumerate(train_data):
-
         correct_n = 0
         total_n = 0
 
         # save training labels
-        network.feature_vectors_labels_train = np.append(network.feature_vectors_labels_train,
-                                                         np.transpose([tlabel.numpy()]), axis=0)
+        network.labels_train = np.append(network.labels_train,
+                                         np.transpose([tlabel.numpy()]), axis=0)
 
         # we input our data in N = <bs_train> samples at a time
         output = network(mini_batch)
@@ -157,7 +175,7 @@ def train():
         if batch_id % 100 == 0:
             train_loss = train_loss.item()
             current = batch_id * len(mini_batch)
-            print('train loss: {:f}   [{}/{}]'.format(np.round(train_loss, 5), current, size))
+            # print('train loss: {:f}   [{}/{}]'.format(np.round(train_loss, 5), current, size))
 
         # check if digit was correctly classified
         pred_label = torch.max(output, 1)[1].data.squeeze()
@@ -172,6 +190,8 @@ def train():
         # train_loss = train_loss.item()
         # current = batch_id * len(mini_batch)
         # print('{:f}, {:f}, {:d}'.format(np.round(train_loss, 5), np.round(batch_accuracy, 5), int(current/64)))
+
+    print('network.complete_train_dataset', np.shape(network.complete_train_dataset))
 
     # save network state after each training epoch
     # torch.save(network.state_dict(), 'model.pth')
@@ -197,8 +217,12 @@ def test():
     # with .no_grad() we make sure pytorch does not perform backprogation/gradient calculations
     with torch.no_grad():
         for data, labels in test_data:
-            network.feature_vectors_labels_test = np.append(network.feature_vectors_labels_test,
-                                                            np.transpose([labels.numpy()]), axis=0)
+            if not network.testing_train_data:
+                network.labels_test = np.append(network.labels_test, np.transpose([labels.numpy()]), axis=0)
+            else:
+                network.labels_train = np.append(network.labels_train, np.transpose([labels.numpy()]), axis=0)
+
+            # print('MNIST max: ', np.amax(data.numpy(), 0))
 
             output = network(data)
             test_loss += lossf(output, labels).item()
@@ -208,9 +232,9 @@ def test():
 
             # store predicted labels
             if not network.testing_train_data:
-                network.feature_vectors_pred_test = np.append(network.feature_vectors_pred_test, pred_label)
+                network.pred_test = np.append(network.pred_test, pred_label)
             else:
-                network.feature_vectors_pred_train = np.append(network.feature_vectors_pred_train, pred_label)
+                network.pred_train = np.append(network.pred_train, pred_label)
 
             for idd, label in enumerate(labels):
                 total_n[label] += 1
@@ -230,80 +254,98 @@ def test():
         print('Average test loss: [{}]'.format(np.round(test_loss, 5)))
 
 
-def clear_variables():
+def clear_test_variables():
     """
-    clear persistent variables
+    clear persistent test variables
     """
-    network.feature_vectors_points_test = np.zeros((0, 2))  # to store 2D feature vectors for testdata
-    network.feature_vectors_labels_test = np.zeros((0, 1), dtype=np.int8)  # to store groundtruth for testdata
-    network.feature_vectors_pred_test = np.zeros((0, 1), dtype=np.int8)  # to store prediction for testdata
-
-    # self.feature_vectors_train = []
-    network.feature_vectors_points_train = np.zeros((0, 2))
-    network.feature_vectors_labels_train = np.zeros((0, 1), dtype=np.int8)
-    network.feature_vectors_pred_train = np.zeros((0, 1), dtype=np.int8)
+    network.feature_vectors_test = np.zeros((0, 2))  # to store 2D feature vectors for testdata
+    network.labels_test = np.zeros((0, 1), dtype=np.int8)  # to store groundtruth for testdata
+    network.pred_test = np.zeros((0, 1), dtype=np.int8)  # to store prediction for testdata
 
 
-def test_handwritten(handwritten_image_dir):
+def clear_train_variables():
+    """
+    clear persistent train variables
+    """
+    network.feature_vectors_train = np.zeros((0, 2))
+    network.labels_train = np.zeros((0, 1), dtype=np.int8)
+    network.pred_train = np.zeros((0, 1), dtype=np.int8)
+
+
+def test_handwritten(images):
+    """
+    Run our handwritten digits throught the (trained) network
+    :param images: Torch image stack torch.Size([10, 1, 28, 28]), handwritten input images to be tested/classified
+    :return:
+    """
+    with torch.no_grad():
+        labels_hw = np.linspace(0, 9, num=10, dtype=np.int8)
+        # Make sure entire network is enabled and in test mode via .eval()
+        network.eval()
+        # check if digit was correctly classified
+        output = network(images)
+        pred_label = torch.max(output, 1)[1].data.squeeze().numpy()
+        correct_frac_avg = np.sum(pred_label == labels_hw) / 10
+        print('Classific HW: accuracy: [{0}], predicted label: {1}'.format(np.round(correct_frac_avg, 3), pred_label))
+
+        print('--- start re-identification handwritten digits ---')
+        re_id_accuracy, topk_indi = re_id_query(network.feature_vectors_test, labels_hw,
+                                                network.feature_vectors_train, network.labels_train, top_k=5)
+
+        print('Re-id accuracy for handwritten digits: [{}]'.format(re_id_accuracy))
+
+        plot_dataset_images(topk_indi)
+
+
+def plot_dataset_images(indices):
+    """
+    Plot function for question 9
+    :param indices: Image indices to plot
+    """
+    plt.figure(figsize=(1, 1))
+
+    for i in range(10):  # loop over digits 0-9
+        plt.subplot(10, 6, (i*6) + 1)  # 10 rows, 6 images per row
+        plt.tight_layout()
+        plt.imshow(images_hw[i, 0], cmap='gray', interpolation='none')
+        # plt.title("GT label: {}".format(i))
+        plt.xticks([])
+        plt.yticks([])
+
+        for ii in range(5):  # loop over top-k 0-5
+            plt.subplot(10, 6, (i*6) + ii + 2)  # 10 rows, 6 images per row
+            plt.tight_layout()
+            topk_ind = indices[ii, i]  # get each indice
+            # plot gallery image belonging to that indice
+            plt.imshow(network.complete_train_dataset[topk_ind, 0], cmap='gray', interpolation='none')
+            # plt.title("Predicted: {}".format(network.pred_train[topk_ind]))  # include predicted label for gallery
+
+            plt.xticks([])
+            plt.yticks([])
+    plt.show()
+
+
+def import_hw_images(handwritten_image_dir):
     """
     Run our handwritten digits throught the (trained) network
     :param handwritten_image_dir: Directory where the handwritten images are stored
     :return:
     """
     image_list = os.listdir(handwritten_image_dir)
-    np_img_arr = np.zeros((0, 1, 28, 28), dtype=np.double)
+    image_stack = []
+    img_norm = np.zeros((28, 28))
 
-    with torch.no_grad():
-        for file_name in image_list:
-            file_loc = os.path.join(handwritten_image_dir, file_name)
+    for file_name in image_list:
+        file_loc = os.path.join(handwritten_image_dir, file_name)
+        img = cv2.imread(file_loc, cv2.IMREAD_GRAYSCALE)
+        img_norm = cv2.normalize(img, img_norm, 0, 1, cv2.NORM_MINMAX)  # make sure values are between [0-1]
+        image_stack.append(torch.tensor(img_norm).to(torch.float))
 
-            image = cv2.imread(file_loc, cv2.IMREAD_GRAYSCALE)
-            image_arr = np.array(image)
-            # print(np.shape(image_arr))  # (28, 28)
-            # print(image_arr)
-
-            np_img_arr = np.append(np_img_arr, [[image_arr]], axis=0)
-
-        torch_input_arr = torch.tensor(np_img_arr)
-        torch_input_arr = torch_input_arr.to(torch.float)
-        labels_hw = np.transpose([np.linspace(0, 9, num=10, dtype=np.int8)])
-        print(np.shape(labels_hw))
-
-        # Make sure entire network is enabled and in test mode via .eval()
-        network.eval()
-
-        # check if digit was correctly classified
-        output = network(torch_input_arr)
-        pred_label = torch.max(output, 1)[1].data.squeeze().numpy()
-        print('pred_label: {}'.format(pred_label))
-
-        print('--- start re-identification handwritten digits ---')
-        print(np.shape(network.feature_vectors_points_test))
-
-        # zip 2D feature vectors (x0, y0) with pred and groudtruth labels (test)
-        # feature_vectors_test_hw = zip(network.feature_vectors_points_test, labels_hw)
-
-        feature_vectors_train_hw = zip(network.feature_vectors_points_train, network.feature_vectors_labels_train)
-
-        # network.feature_vectors_points_test
-        results_hw = re_id_query(network.feature_vectors_points_test, feature_vectors_train_hw, 5)
-
-        print('results_hw: {}'.format(np.shape(results_hw)))
-
-        n_correct_re_id_hw = 0
-        n_queries_hw = 10
-        k_re_id_hw = 5
-
-        for ii in range(n_queries_hw):
-            query_true_label_hw = ii
-
-            # count how often the true label occurs in the return result
-            assigned_hw = results_hw[ii][:, 2]
-            print('assigned_hw: {}'.format(assigned_hw))
-            n_correct_re_id_hw += np.count_nonzero(assigned_hw == query_true_label_hw)
-
-        re_id_accuracy_hw = np.round(n_correct_re_id_hw / (n_queries_hw * k_re_id_hw), 3)
-        print('Re-id handwritten top-5 accuracy: [{0}]'.format(re_id_accuracy_hw))
+    images = torch.stack(image_stack, dim=0)
+    mean = torch.mean(images, (0, 1, 2))
+    std = torch.std(images, (0, 1, 2))
+    images = (images[:, None, :, :] - mean) / std  # make sure all pixelvalues follow a standard normal distribution
+    return images
 
 
 if __name__ == '__main__':
@@ -326,9 +368,11 @@ if __name__ == '__main__':
     # create network object
     network = Network()
 
+    concatenate_dataset()  # for plotting
+
     # uncomment this line if we want to execute from pre-trained model
     network.load_state_dict(torch.load('model.pth'))
-    print(network)
+    # print(network)
 
     # optimizer for backpropagation
     optimizer = optim.SGD(network.parameters(), lr=LR, momentum=momentum)
@@ -339,58 +383,51 @@ if __name__ == '__main__':
     # nn.CrossEntropyLoss combines nn.LogSoftmax and nn.NLLLoss.
     lossf = nn.CrossEntropyLoss()
 
+    # import handwritten images
+    images_hw = import_hw_images('processed')
+
     for epoch in range(n_epochs):
         print('--- Epoch: {0} - {1} seconds ---'.format(epoch, round(time.time() - start_time, 0)))
-
-        # to hold sorted 2d feature vectors for plotting test data
-        sorted_features_plot = np.zeros((10, 20, 2))
+        mnist_fv_plot = np.zeros((10, 20, 2))  # to hold sorted 2d feature vectors for plotting test data
+        hw_fv_plot = np.zeros((10, 1, 2))  # to hold sorted 2d feature vectors for plotting test data
 
         # we test once without training, then we complete the epoch loop
-        test()  # test updated model
-        clear_variables()  # clear 2d feature vectors
+        clear_test_variables()  # clear 2d feature vectors
+        clear_train_variables()
 
-        # 1 training epoch
-        train()
+        test()  # test (updated) model
 
-        # test handwritten MNIST digits
-        test_handwritten('processed')
-        clear_variables()  # clear 2d feature vectors
+        # run a dry test with training data
+        network.testing_train_data = True
+        test_data_cpy = test_data
+        test_data = train_data
+        test()
+        test_data = test_data_cpy
+        network.testing_train_data = False
 
-        # concatenate feature vectors and labels into a single np array so it's easy to search through
-        pts_labels_test = np.concatenate((network.feature_vectors_points_test, network.feature_vectors_labels_test),
-                                         axis=1)
+        # re-id testdata/gallery
+        re_id_acc, topkind = re_id_query(network.feature_vectors_test, network.labels_test,
+                                         network.feature_vectors_train, network.labels_train, top_k=20)
 
-        # zip 2D feature vectors (x0, y0) with pred and groudtruth labels (test)
-        feature_vectors_test = zip(network.feature_vectors_points_test, network.feature_vectors_labels_test,
-                                   network.feature_vectors_pred_test)
+        print('Re-id accuracy for test/train set MNIST: [{}]'.format(re_id_acc))
+
+        # for plotting
+        points_test = np.concatenate((network.feature_vectors_test, network.labels_test),
+                                     axis=1)
+
+        # re-id + test handwritten MNIST digits
+        clear_test_variables()
+        test_handwritten(images_hw)
+
+        # for plotting handwritten feature vector points
+        hw_fv_plot = np.expand_dims(network.feature_vectors_test, axis=1)
 
         # sort data by label for plotting
         for id_x in range(10):
-            sorted_features_plot[id_x] = pts_labels_test[np.where(pts_labels_test[:, 2] == id_x)][:20, :2]
+            mnist_fv_plot[id_x] = points_test[np.where(points_test[:, 2] == id_x)][:20, :2]
 
         # plot 2D feature embedding space of test data
-        # plot(sorted_features_plot)
+        plot(mnist_fv_plot, hw_fv_plot)
 
-        # zip 2D feature vectors (x0, y0) with groudtruth labels (train)
-        feature_vectors_train = zip(network.feature_vectors_points_train, network.feature_vectors_labels_train)
-
-        # get top k = k_re_id performance
-        n_correct_re_id = 0
-        k_re_id = 20
-        n_queries = 100
-
-        # Determine the number of correct digit, i.e. the top-20 re-ID performance.
-        # 100 queries or all queries? All queries = 10.000 * 60.000 = 6*10^8 distance calculations, way too many!
-        print('--- start re-identification ---')
-        results = re_id_query(network.feature_vectors_points_test[:n_queries, :], feature_vectors_train, k_re_id)
-        # results = re_id_query(network.feature_vectors_points_test, feature_vectors_train, k_re_id)  # all test points
-
-        for iddx in range(n_queries):
-            query_true_label = network.feature_vectors_labels_test[iddx]
-
-            # count how often the true label occurs in the return result
-            assigned = results[iddx][:, 2]
-            n_correct_re_id += np.count_nonzero(assigned == query_true_label)
-
-        re_id_accuracy = np.round(n_correct_re_id / (n_queries * k_re_id), 3)
-        print('Re-identification top-20 accuracy: [{0}]'.format(re_id_accuracy))
+        # 1 training epoch
+        train()
