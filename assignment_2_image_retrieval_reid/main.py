@@ -126,7 +126,7 @@ def import_data(batch_size_train_s, batch_size_test_s):
     train_d = torch.utils.data.DataLoader(
         datasets.MNIST('./data', train=True, download=True, transform=transform),
         batch_size=batch_size_train_s, shuffle=False)
-        # batch_size=batch_size_train_s, shuffle = true)
+    # batch_size=batch_size_train_s, shuffle = true)
 
     test_d = torch.utils.data.DataLoader(
         datasets.MNIST('./data', train=False, download=True, transform=transform),
@@ -287,10 +287,11 @@ def test_handwritten(images):
         print('Classific HW: accuracy: [{0}], predicted label: {1}'.format(np.round(correct_frac_avg, 3), pred_label))
 
         print('--- start re-identification handwritten digits ---')
-        re_id_accuracy, topk_indi = re_id_query(network.feature_vectors_test, labels_hw,
-                                                network.feature_vectors_train, network.labels_train, top_k=5)
+        re_id_accuracy, topk_indi, meanap = re_id_query(network.feature_vectors_test, labels_hw,
+                                                        network.feature_vectors_train, network.labels_train, top_k=5)
 
         print('Re-id accuracy for handwritten digits: [{}]'.format(re_id_accuracy))
+        print('mAP handwritten digits: [{}]'.format(np.round(meanap, 5)))
 
         # plot_dataset_images(topk_indi)
 
@@ -303,7 +304,7 @@ def plot_dataset_images(indices):
     plt.figure(figsize=(1, 1))
 
     for i in range(10):  # loop over digits 0-9
-        plt.subplot(10, 6, (i*6) + 1)  # 10 rows, 6 images per row
+        plt.subplot(10, 6, (i * 6) + 1)  # 10 rows, 6 images per row
         plt.tight_layout()
         plt.imshow(images_hw[i, 0], cmap='gray', interpolation='none')
         # plt.title("GT label: {}".format(i))
@@ -311,7 +312,7 @@ def plot_dataset_images(indices):
         plt.yticks([])
 
         for ii in range(5):  # loop over top-k 0-5
-            plt.subplot(10, 6, (i*6) + ii + 2)  # 10 rows, 6 images per row
+            plt.subplot(10, 6, (i * 6) + ii + 2)  # 10 rows, 6 images per row
             plt.tight_layout()
             topk_ind = indices[ii, i]  # get each indice
             # plot gallery image belonging to that indice
@@ -342,8 +343,7 @@ def import_hw_images(handwritten_image_dir):
     images = torch.stack(image_stack, dim=0)
     mean = torch.mean(images, (0, 1, 2))
     std = torch.std(images, (0, 1, 2))
-    # images = (images[:, None, :, :] - mean) / std  # make sure all pixelvalues follow a standard normal distribution
-    images = images[:, None, :, :]  # make sure all pixelvalues follow a standard normal distribution
+    images = (images[:, None, :, :] - mean) / std  # make sure all pixelvalues follow a standard normal distribution
     return images
 
 
@@ -370,7 +370,7 @@ if __name__ == '__main__':
     # concatenate_dataset()  # for plotting
 
     # uncomment this line if we want to execute from pre-trained model
-    network.load_state_dict(torch.load('model.pth'))
+    # network.load_state_dict(torch.load('model.pth'))
     # print(network)
 
     # optimizer for backpropagation
@@ -392,34 +392,32 @@ if __name__ == '__main__':
 
         # we test once without training, then we complete the epoch loop
         clear_test_variables()  # clear 2d feature vectors
-        clear_train_variables()
-
         test()  # test (updated) model
 
         # run a dry test with training data
-        print('--- running dry test on training data ---')
-        network.testing_train_data = True
-        test_data_cpy = test_data
-        test_data = train_data
-        test()
-        test_data = test_data_cpy
-        network.testing_train_data = False
+        if epoch == 0:
+            print('--- running dry test on training data ---')
+            network.testing_train_data = True
+            test_data_cpy = test_data
+            test_data = train_data
+            test()
+            test_data = test_data_cpy
+            network.testing_train_data = False
 
         # re-id testdata/gallery
-        re_id_acc, topkind = re_id_query(network.feature_vectors_test, network.labels_test,
-                                         network.feature_vectors_train, network.labels_train, top_k=20)
+        re_id_acc, topkind, mean_ap = re_id_query(network.feature_vectors_test, network.labels_test,
+                                                  network.feature_vectors_train, network.labels_train, top_k=20)
 
         print('Re-id accuracy for test/train set MNIST: [{}]'.format(re_id_acc))
-
-        # implement mean Average Precision (mAP) metric
+        print('mAP test/train set MNIST: [{}]'.format(np.round(mean_ap, 5)))
 
         # for plotting
         # points_test = np.concatenate((network.feature_vectors_test, network.labels_test),
         #                              axis=1)
 
         # re-id + test handwritten MNIST digits
-        clear_test_variables()
-        test_handwritten(images_hw)
+        # clear_test_variables()
+        # test_handwritten(images_hw)
 
         # for plotting handwritten feature vector points
         # hw_fv_plot = np.expand_dims(network.feature_vectors_test, axis=1)
@@ -432,4 +430,5 @@ if __name__ == '__main__':
         # plot(mnist_fv_plot, hw_fv_plot)
 
         # 1 training epoch
+        clear_train_variables()
         train()
