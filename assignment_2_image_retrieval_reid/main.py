@@ -191,8 +191,6 @@ def train():
         # current = batch_id * len(mini_batch)
         # print('{:f}, {:f}, {:d}'.format(np.round(train_loss, 5), np.round(batch_accuracy, 5), int(current/64)))
 
-    print('network.complete_train_dataset', np.shape(network.complete_train_dataset))
-
     # save network state after each training epoch
     # torch.save(network.state_dict(), 'model.pth')
     # torch.save(optimizer.state_dict(), 'optimizer.pth')
@@ -294,7 +292,7 @@ def test_handwritten(images):
 
         print('Re-id accuracy for handwritten digits: [{}]'.format(re_id_accuracy))
 
-        plot_dataset_images(topk_indi)
+        # plot_dataset_images(topk_indi)
 
 
 def plot_dataset_images(indices):
@@ -344,7 +342,8 @@ def import_hw_images(handwritten_image_dir):
     images = torch.stack(image_stack, dim=0)
     mean = torch.mean(images, (0, 1, 2))
     std = torch.std(images, (0, 1, 2))
-    images = (images[:, None, :, :] - mean) / std  # make sure all pixelvalues follow a standard normal distribution
+    # images = (images[:, None, :, :] - mean) / std  # make sure all pixelvalues follow a standard normal distribution
+    images = images[:, None, :, :]  # make sure all pixelvalues follow a standard normal distribution
     return images
 
 
@@ -368,7 +367,7 @@ if __name__ == '__main__':
     # create network object
     network = Network()
 
-    concatenate_dataset()  # for plotting
+    # concatenate_dataset()  # for plotting
 
     # uncomment this line if we want to execute from pre-trained model
     network.load_state_dict(torch.load('model.pth'))
@@ -398,6 +397,7 @@ if __name__ == '__main__':
         test()  # test (updated) model
 
         # run a dry test with training data
+        print('--- running dry test on training data ---')
         network.testing_train_data = True
         test_data_cpy = test_data
         test_data = train_data
@@ -411,23 +411,25 @@ if __name__ == '__main__':
 
         print('Re-id accuracy for test/train set MNIST: [{}]'.format(re_id_acc))
 
+        # implement mean Average Precision (mAP) metric
+
         # for plotting
-        points_test = np.concatenate((network.feature_vectors_test, network.labels_test),
-                                     axis=1)
+        # points_test = np.concatenate((network.feature_vectors_test, network.labels_test),
+        #                              axis=1)
 
         # re-id + test handwritten MNIST digits
         clear_test_variables()
         test_handwritten(images_hw)
 
         # for plotting handwritten feature vector points
-        hw_fv_plot = np.expand_dims(network.feature_vectors_test, axis=1)
+        # hw_fv_plot = np.expand_dims(network.feature_vectors_test, axis=1)
 
         # sort data by label for plotting
-        for id_x in range(10):
-            mnist_fv_plot[id_x] = points_test[np.where(points_test[:, 2] == id_x)][:20, :2]
+        # for id_x in range(10):
+        #     mnist_fv_plot[id_x] = points_test[np.where(points_test[:, 2] == id_x)][:20, :2]
 
         # plot 2D feature embedding space of test data
-        plot(mnist_fv_plot, hw_fv_plot)
+        # plot(mnist_fv_plot, hw_fv_plot)
 
         # 1 training epoch
         train()
