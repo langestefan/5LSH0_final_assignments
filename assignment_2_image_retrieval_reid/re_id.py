@@ -23,9 +23,9 @@ def calculate_distances(data, point):
 def re_id_query(queries, q_labels, gallery, g_labels, top_k):
     """
     Do re-id query between all input queries and all input gallery samples
-    :param queries: Array(N,2) of points we want to query, UNKNOWN labels
+    :param queries: Array(Nq, emb_dim) of points we want to query, UNKNOWN labels
     :param q_labels: Query labels
-    :param gallery: All points, KNOWN labels
+    :param gallery: Array(Ng, emb_dim) of all points, KNOWN labels
     :param g_labels: Gallery labels
     :param top_k: Closest top_k number of points we want to use for re-id
     :return: Array(n_queries, n_results). Labels for N = <n_results> from gallery ranked by distance to query points
@@ -68,7 +68,7 @@ def re_id_query(queries, q_labels, gallery, g_labels, top_k):
                 # print('Matching: GT, labels, ap_sum', q_labels[i_query], topk_sorted_labels[:, i_query], ap_sum)
 
             ap = ap_sum / n_tp  # AP = ap_sum / TP   [0, 1]
-            print('ap: ', ap)
+            # print('ap: ', ap)
             ap_avg_sum += ap
 
     # compute re-id and mean_ap result

@@ -10,6 +10,7 @@ import matplotlib.pyplot as plt
 import matplotlib
 import os
 import cv2
+from sklearn.decomposition import PCA
 
 from re_id import re_id_query
 
@@ -21,12 +22,12 @@ class Network(nn.Module):
         # to store 2d feature vector results
         # store this in zip((x0,y0), label, prediction)
         # self.feature_vectors_test = []
-        self.feature_vectors_test = np.zeros((0, 2))  # to store 2D feature vectors for testdata
+        self.feature_vectors_test = np.zeros((0, emb_dim))  # to store emb_dim feature vectors for testdata
         self.labels_test = np.zeros((0, 1), dtype=np.int8)  # to store groundtruth for testdata
         self.pred_test = np.zeros((0, 1), dtype=np.int8)  # to store prediction for testdata
 
         # self.feature_vectors_train = []
-        self.feature_vectors_train = np.zeros((0, 2))  # to store 2D feature vectors for traindata
+        self.feature_vectors_train = np.zeros((0, emb_dim))  # to store emb_dim feature vectors for traindata
         self.labels_train = np.zeros((0, 1), dtype=np.int8)  # to store groundtruth for traindata
         self.pred_train = np.zeros((0, 1), dtype=np.int8)  # to store prediction for traindata
 
@@ -66,9 +67,9 @@ class Network(nn.Module):
             nn.ReLU(),
             nn.MaxPool2d(kernel_size=7),  # global max of each filter
             nn.Flatten(),  # flatten to create 32 dimensional input vector for fully connected layer
-            nn.Linear(32, 2),  # 2D FC
+            nn.Linear(32, emb_dim),  # 2D FC
         )
-        self.fc2 = nn.Linear(2, 10)  # 10D FC
+        self.fc2 = nn.Linear(emb_dim, 10)  # 10D FC
 
     def forward(self, x):
         x = self.conv1(x)
@@ -89,11 +90,13 @@ class Network(nn.Module):
 def plot(mnist_points, hw_points):
     """
     Plot function from assignment document
-    :param hw_points: Handwritten data feature vectors (digits, points, (x0, y0)) = (10, 1, 2)
-    :param mnist_points: MNIST feature vectors (digits, points, (x0, y0)) = (10, 20, 2)
+    :param hw_points: Handwritten data feature vectors (digits, points, (x0, y0)) = (10, 1, ndim)
+    :param mnist_points: MNIST feature vectors (digits, points, (x0, y0)) = (10, 20, ndim)
     """
     colors = matplotlib.cm.Paired(np.linspace(0, 1, len(mnist_points)))
     fig, ax = plt.subplots(figsize=(7, 5))
+    print('mnist_points [{}]'.format(np.shape(mnist_points)))
+    print('hw_points: [{}]'.format(np.shape(hw_points)))
 
     for (points, color, digit) in zip(mnist_points, colors, range(10)):
         ax.scatter([item[0] for item in points],
@@ -256,7 +259,7 @@ def clear_test_variables():
     """
     clear persistent test variables
     """
-    network.feature_vectors_test = np.zeros((0, 2))  # to store 2D feature vectors for testdata
+    network.feature_vectors_test = np.zeros((0, emb_dim))  # to store 2D feature vectors for testdata
     network.labels_test = np.zeros((0, 1), dtype=np.int8)  # to store groundtruth for testdata
     network.pred_test = np.zeros((0, 1), dtype=np.int8)  # to store prediction for testdata
 
@@ -265,7 +268,7 @@ def clear_train_variables():
     """
     clear persistent train variables
     """
-    network.feature_vectors_train = np.zeros((0, 2))
+    network.feature_vectors_train = np.zeros((0, emb_dim))
     network.labels_train = np.zeros((0, 1), dtype=np.int8)
     network.pred_train = np.zeros((0, 1), dtype=np.int8)
 
@@ -356,6 +359,7 @@ if __name__ == '__main__':
     momentum = 0.9
     n_epochs = 10
     bs_train = 64
+    emb_dim = 10
 
     # torch settings
     torch.backends.cudnn.enabled = False  # turn off GPU processing
@@ -391,6 +395,8 @@ if __name__ == '__main__':
         hw_fv_plot = np.zeros((10, 1, 2))  # to hold sorted 2d feature vectors for plotting test data
 
         # we test once without training, then we complete the epoch loop
+        # print('network.feature_vectors_test: [{}]'.format(np.shape(network.feature_vectors_test)))
+        # print('network.feature_vectors_train: [{}]'.format(np.shape(network.feature_vectors_train)))
         clear_test_variables()  # clear 2d feature vectors
         test()  # test (updated) model
 
@@ -404,30 +410,54 @@ if __name__ == '__main__':
             test_data = test_data_cpy
             network.testing_train_data = False
 
-        # re-id testdata/gallery
-        # re_id_acc, topkind, mean_ap = re_id_query(network.feature_vectors_test, network.labels_test,
-        #                                           network.feature_vectors_train, network.labels_train, top_k=20)
-        #
-        # print('Re-id accuracy for test/train set MNIST: [{}]'.format(re_id_acc))
-        # print('mAP test/train set MNIST: [{}]'.format(np.round(mean_ap, 5)))
+        print('network.feature_vectors_test: [{}]'.format(np.shape(network.feature_vectors_test)))
+        print('network.feature_vectors_train: [{}]'.format(np.shape(network.feature_vectors_train)))
 
-        # for plotting
-        # points_test = np.concatenate((network.feature_vectors_test, network.labels_test),
-        #                              axis=1)
+        # re-id testdata/gallery
+        re_id_acc, topkind, mean_ap = re_id_query(network.feature_vectors_test, network.labels_test,
+                                                  network.feature_vectors_train, network.labels_train, top_k=20)
+
+        print('Re-id accuracy for test/train set MNIST: [{}]'.format(re_id_acc))
+        print('mAP test/train set MNIST: [{}]'.format(np.round(mean_ap, 5)))
+
+        # print('network.feature_vectors_test: [{}]'.format(np.shape(network.feature_vectors_test)))
+        # print('network.feature_vectors_train: [{}]'.format(np.shape(network.feature_vectors_train)))
+
+        # store MNIST test set feature vectors
+        mnist_test_fv = network.feature_vectors_test
+        mnist_test_labels = network.labels_test
+        mnist_len = np.shape(network.feature_vectors_test)[0]
 
         # re-id + test handwritten MNIST digits
         clear_test_variables()
         test_handwritten(images_hw)
 
-        # for plotting handwritten feature vector points
-        # hw_fv_plot = np.expand_dims(network.feature_vectors_test, axis=1)
+        # store handwritten set feature vectors
+        hw_test = network.feature_vectors_test
+
+        # if dim>2, we apply PCA to reduce dimension for plotting
+        if np.shape(mnist_test_fv)[1] > 2:
+            mnist_hw_fv = np.append(mnist_test_fv, hw_test, axis=0)  # append to apply PCA to combined dataset
+            print('mnist_hw_fv: {}'.format(np.shape(mnist_hw_fv)))
+            pca = PCA(n_components=2, svd_solver='full')
+            mnist_hw_fv_2d = pca.fit_transform(mnist_hw_fv)
+
+        # split dataset again
+        mnist_fv_2d = mnist_hw_fv_2d[:mnist_len]
+        hw_fv_2d = mnist_hw_fv_2d[mnist_len:]
+
+        # for plotting
+        mnist_test_fv_plot = np.concatenate((mnist_fv_2d, mnist_test_labels), axis=1)
+        hw_fv_plot = np.expand_dims(hw_fv_2d, axis=1)
+
+        print('mnist_test [{}]'.format(np.shape(mnist_test_fv_plot)))
 
         # sort data by label for plotting
-        # for id_x in range(10):
-        #     mnist_fv_plot[id_x] = points_test[np.where(points_test[:, 2] == id_x)][:20, :2]
+        for id_x in range(10):
+            mnist_fv_plot[id_x] = mnist_test_fv_plot[np.where(mnist_test_fv_plot[:, 2] == id_x)][:20, :2]
 
         # plot 2D feature embedding space of test data
-        # plot(mnist_fv_plot, hw_fv_plot)
+        plot(mnist_fv_plot, hw_fv_plot)
 
         # 1 training epoch
         clear_train_variables()
