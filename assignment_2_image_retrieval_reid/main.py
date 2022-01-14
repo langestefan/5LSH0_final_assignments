@@ -125,12 +125,12 @@ def import_data(batch_size_train_s, batch_size_test_s):
 
     train_d = torch.utils.data.DataLoader(
         datasets.MNIST('./data', train=True, download=True, transform=transform),
-        batch_size=batch_size_train_s, shuffle=False)
-    # batch_size=batch_size_train_s, shuffle = true)
+        # batch_size=batch_size_train_s, shuffle=False)
+        batch_size=batch_size_train_s, shuffle=True)
 
     test_d = torch.utils.data.DataLoader(
         datasets.MNIST('./data', train=False, download=True, transform=transform),
-        batch_size=batch_size_test_s, shuffle=False)  # shuffle to false to track points over epochs
+        batch_size=batch_size_test_s, shuffle=True)  # shuffle to false to track points over epochs
 
     return train_d, test_d
 
@@ -405,19 +405,19 @@ if __name__ == '__main__':
             network.testing_train_data = False
 
         # re-id testdata/gallery
-        re_id_acc, topkind, mean_ap = re_id_query(network.feature_vectors_test, network.labels_test,
-                                                  network.feature_vectors_train, network.labels_train, top_k=20)
-
-        print('Re-id accuracy for test/train set MNIST: [{}]'.format(re_id_acc))
-        print('mAP test/train set MNIST: [{}]'.format(np.round(mean_ap, 5)))
+        # re_id_acc, topkind, mean_ap = re_id_query(network.feature_vectors_test, network.labels_test,
+        #                                           network.feature_vectors_train, network.labels_train, top_k=20)
+        #
+        # print('Re-id accuracy for test/train set MNIST: [{}]'.format(re_id_acc))
+        # print('mAP test/train set MNIST: [{}]'.format(np.round(mean_ap, 5)))
 
         # for plotting
         # points_test = np.concatenate((network.feature_vectors_test, network.labels_test),
         #                              axis=1)
 
         # re-id + test handwritten MNIST digits
-        # clear_test_variables()
-        # test_handwritten(images_hw)
+        clear_test_variables()
+        test_handwritten(images_hw)
 
         # for plotting handwritten feature vector points
         # hw_fv_plot = np.expand_dims(network.feature_vectors_test, axis=1)
