@@ -95,8 +95,6 @@ def plot(mnist_points, hw_points):
     """
     colors = matplotlib.cm.Paired(np.linspace(0, 1, len(mnist_points)))
     fig, ax = plt.subplots(figsize=(7, 5))
-    print('mnist_points [{}]'.format(np.shape(mnist_points)))
-    print('hw_points: [{}]'.format(np.shape(hw_points)))
 
     for (points, color, digit) in zip(mnist_points, colors, range(10)):
         ax.scatter([item[0] for item in points],
@@ -133,7 +131,7 @@ def import_data(batch_size_train_s, batch_size_test_s):
 
     test_d = torch.utils.data.DataLoader(
         datasets.MNIST('./data', train=False, download=True, transform=transform),
-        batch_size=batch_size_test_s, shuffle=True)  # shuffle to false to track points over epochs
+        batch_size=batch_size_test_s, shuffle=False)  # shuffle to false to track points over epochs
 
     return train_d, test_d
 
@@ -395,8 +393,6 @@ if __name__ == '__main__':
         hw_fv_plot = np.zeros((10, 1, 2))  # to hold sorted 2d feature vectors for plotting test data
 
         # we test once without training, then we complete the epoch loop
-        # print('network.feature_vectors_test: [{}]'.format(np.shape(network.feature_vectors_test)))
-        # print('network.feature_vectors_train: [{}]'.format(np.shape(network.feature_vectors_train)))
         clear_test_variables()  # clear 2d feature vectors
         test()  # test (updated) model
 
@@ -410,18 +406,12 @@ if __name__ == '__main__':
             test_data = test_data_cpy
             network.testing_train_data = False
 
-        print('network.feature_vectors_test: [{}]'.format(np.shape(network.feature_vectors_test)))
-        print('network.feature_vectors_train: [{}]'.format(np.shape(network.feature_vectors_train)))
-
         # re-id testdata/gallery
         re_id_acc, topkind, mean_ap = re_id_query(network.feature_vectors_test, network.labels_test,
                                                   network.feature_vectors_train, network.labels_train, top_k=20)
 
         print('Re-id accuracy for test/train set MNIST: [{}]'.format(re_id_acc))
         print('mAP test/train set MNIST: [{}]'.format(np.round(mean_ap, 5)))
-
-        # print('network.feature_vectors_test: [{}]'.format(np.shape(network.feature_vectors_test)))
-        # print('network.feature_vectors_train: [{}]'.format(np.shape(network.feature_vectors_train)))
 
         # store MNIST test set feature vectors
         mnist_test_fv = network.feature_vectors_test
@@ -438,7 +428,6 @@ if __name__ == '__main__':
         # if dim>2, we apply PCA to reduce dimension for plotting
         if np.shape(mnist_test_fv)[1] > 2:
             mnist_hw_fv = np.append(mnist_test_fv, hw_test, axis=0)  # append to apply PCA to combined dataset
-            print('mnist_hw_fv: {}'.format(np.shape(mnist_hw_fv)))
             pca = PCA(n_components=2, svd_solver='full')
             mnist_hw_fv_2d = pca.fit_transform(mnist_hw_fv)
 
@@ -449,8 +438,6 @@ if __name__ == '__main__':
         # for plotting
         mnist_test_fv_plot = np.concatenate((mnist_fv_2d, mnist_test_labels), axis=1)
         hw_fv_plot = np.expand_dims(hw_fv_2d, axis=1)
-
-        print('mnist_test [{}]'.format(np.shape(mnist_test_fv_plot)))
 
         # sort data by label for plotting
         for id_x in range(10):
