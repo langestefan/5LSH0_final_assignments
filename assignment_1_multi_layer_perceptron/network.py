@@ -11,25 +11,25 @@ class Network:
         self.input = []
 
         # hidden layer 1
-        self.hidden1_dim = 1
-        self.hidden1_activation = []
-        self.weights_input_hidden1 = []
-        self.pre_hidden1 = []
-        self.bias_hidden1 = []
+        self.hidden_dim = 1
+        self.hidden_activation = []
+        self.weights_input_hidden = []
+        self.pre_hidden = []
+        self.bias_hidden = []
         self.relu = True
 
         # output layer
         self.output_dim = 1
         self.output_activation = []
-        self.weights_hidden1_output = []
+        self.weights_hidden_output = []
         self.pre_output = []
         self.bias_output = []
 
         # gradients
         # to keep track of the sum of the gradients
-        self.sum_grad_w_hidden1 = []
+        self.sum_grad_w_hidden = []
         self.sum_grad_w_output = []
-        self.sum_grad_b_hidden1 = []
+        self.sum_grad_b_hidden = []
         self.sum_grad_b_output = []
 
     def init_neurons(self):
@@ -40,23 +40,23 @@ class Network:
         self.input = np.zeros(self.input_dim)
 
         # activation
-        self.hidden1_activation = np.zeros(self.hidden1_dim)
+        self.hidden_activation = np.zeros(self.hidden_dim)
         self.output_activation = np.zeros(self.output_dim)
 
         # bias
-        self.bias_hidden1 = np.zeros(self.hidden1_dim)
+        self.bias_hidden = np.zeros(self.hidden_dim)
         self.bias_output = np.zeros(self.output_dim)
-        # self.bias_hidden1 = np.random.uniform(-1, 1, self.hidden1_dim)
+        # self.bias_hidden = np.random.uniform(-1, 1, self.hidden_dim)
         # self.bias_output = np.random.uniform(-1, 1, self.output_dim)
 
         # input
-        self.pre_hidden1 = np.zeros(self.hidden1_dim)
+        self.pre_hidden = np.zeros(self.hidden_dim)
         self.pre_output = np.zeros(self.output_dim)
 
         # gradients
-        self.sum_grad_w_hidden1 = np.zeros((self.input_dim, self.hidden1_dim))
-        self.sum_grad_w_output = np.zeros((self.hidden1_dim, self.output_dim))
-        self.sum_grad_b_hidden1 = np.zeros(self.hidden1_dim)
+        self.sum_grad_w_hidden = np.zeros((self.input_dim, self.hidden_dim))
+        self.sum_grad_w_output = np.zeros((self.hidden_dim, self.output_dim))
+        self.sum_grad_b_hidden = np.zeros(self.hidden_dim)
         self.sum_grad_b_output = np.zeros(self.output_dim)
 
     def init_weights(self):
@@ -64,15 +64,15 @@ class Network:
         Initialize weight arrays
         """
         # to keep same weights next time program is run
-        np.random.seed(5)
+        # np.random.seed(5)
 
         # xavier weight initialization w ~ U(-1/sqrt(n), 1/sqrt(n))
         w_h1 = 1/np.sqrt(self.input_dim)
-        w_o = 1/np.sqrt(self.hidden1_dim)
+        w_o = 1/np.sqrt(self.hidden_dim)
 
         # random (xavier) uniform initialization for weights
-        self.weights_input_hidden1 = np.random.uniform(-w_h1, w_h1, (self.input_dim, self.hidden1_dim))
-        self.weights_hidden1_output = np.random.uniform(-w_o, w_o, (self.hidden1_dim, self.output_dim))
+        self.weights_input_hidden = np.random.uniform(-w_h1, w_h1, (self.input_dim, self.hidden_dim))
+        self.weights_hidden_output = np.random.uniform(-w_o, w_o, (self.hidden_dim, self.output_dim))
 
     def forward_pass(self, input_data, one_hot_label):
         """
@@ -87,15 +87,15 @@ class Network:
         # input --> hidden layer 1 (ReLU)
         # output = input_vector * weight_matrix  + bias_vector
         # Y = XW + B
-        self.pre_hidden1 = np.matmul(self.input, self.weights_input_hidden1) + self.bias_hidden1
+        self.pre_hidden = np.matmul(self.input, self.weights_input_hidden) + self.bias_hidden
 
         if self.relu:
-            self.hidden1_activation = activation.relu(self.pre_hidden1)
+            self.hidden_activation = activation.relu(self.pre_hidden)
         else:
-            self.hidden1_activation = activation.sigmoid(self.pre_hidden1)
+            self.hidden_activation = activation.sigmoid(self.pre_hidden)
 
         # hidden layer 1 --> output (SoftMax)
-        self.pre_output = np.matmul(self.hidden1_activation, self.weights_hidden1_output) + self.bias_output
+        self.pre_output = np.matmul(self.hidden_activation, self.weights_hidden_output) + self.bias_output
         self.output_activation = activation.softmax(self.pre_output)
 
         # after forward pass we return the loss using Cross Entropy loss function
@@ -118,20 +118,20 @@ class Network:
 
         # Compute gradient for weights in output layer, should give (40,10) matrix
         # gradient_wij = h_j * (o_i - y_i) = vect_H^T * vect_gradient_output
-        grad_w_output = np.matmul(np.transpose([self.hidden1_activation]), [gradient_output])
+        grad_w_output = np.matmul(np.transpose([self.hidden_activation]), [gradient_output])
 
         # Compute gradient for biases in output layer
         # gradient_b = 1 * (o_i - y_i) = o_i - y_i
         grad_b_output = gradient_output
 
         # Compute vector for gradient of h1 hidden output
-        gradient_h1_s = np.sum(gradient_output * self.weights_hidden1_output, axis=1)
+        gradient_h1_s = np.sum(gradient_output * self.weights_hidden_output, axis=1)
 
         # Back-propagation for ReLU
         if self.relu:
-            hidden_bw = activation.relu_bw(self.pre_hidden1)
+            hidden_bw = activation.relu_bw(self.pre_hidden)
         else:
-            hidden_bw = activation.sigmoid_bw(self.pre_hidden1)
+            hidden_bw = activation.sigmoid_bw(self.pre_hidden)
 
         # Compute gradient from the error function to the input of the hidden layer
         gradient_e_to_h1_in = gradient_h1_s * hidden_bw
