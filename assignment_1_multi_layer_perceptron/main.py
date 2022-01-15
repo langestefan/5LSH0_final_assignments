@@ -1,53 +1,83 @@
 from torchvision import datasets
-import torch
 import torchvision
+import torch
+from torchvision.transforms import ToTensor
 import numpy as np
 import network
 from math import floor
 import time
 
 
-def import_data(batch_size_train_s, batch_size_test_s):
+def import_data(train_b_size, test_b_size, shuffle=True):
     """
-    This function imports the MNIST dataset. This is the only function that makes use of pytorch, as per assignment
-    requirements: "You are allowed to load the MNIST dataset in any way of your choice."
-
-    !!!!!!!!!!!!!!data loader is not allowed, shuffling and batching must be implemented yourself!!!!!!!!!!!!
-    use dataset instead
-    :param batch_size_train_s: Batch size for training
-    :param batch_size_test_s: Batch size for testing
+    This function imports the MNIST dataset. We use pytorch to load the dataset as tensors.
+    :param shuffle: shuffle test/train data
+    :param train_b_size: Batch size for training
+    :param test_b_size: Batch size for testing
     :return: Train/test data objects
     """
-    transform = torchvision.transforms.Compose([
-        torchvision.transforms.ToTensor(),
-        torchvision.transforms.Normalize((0.1307,), (0.3081,))
-    ])
+    print('--- Importing data ---')
+    testing_data = datasets.MNIST('./data', train=False, download=True, transform=ToTensor())
+    n_test_samp = len(testing_data)  # total number of test samples
+    # n_testb = int(np.floor(len(testing_data) / test_b_size))  # number of train batches
 
-    train_d = torch.utils.data.DataLoader(
-        datasets.MNIST('./data', train=True, download=True, transform=transform),
-        batch_size=batch_size_train_s, shuffle=True)
+    training_data = datasets.MNIST('./data', train=True, download=True, transform=ToTensor())
+    n_train_samp = len(training_data)  # total number of train samples
+    # n_trainb = int(np.floor(len(training_data) / train_b_size))  # number of test batches
 
-    test_d = torch.utils.data.DataLoader(
-        datasets.MNIST('./data', train=False, download=True, transform=transform),
-        batch_size=batch_size_test_s, shuffle=True)
+    # data batch arrays. Each index is a batch
+    test_imgs_batched = []
+    test_labels_batched = []
+    train_imgs_batched = []
+    train_labels_batched = []
 
-    return train_d, test_d
+    mean = 0.1307
+    std = 0.3081
+
+    # shuffle our indices
+    if shuffle:
+        rng = np.random.default_rng()
+        test_ind = rng.permutation(n_test_samp)
+        train_ind = rng.permutation(n_train_samp)
+
+    # construct test setd
+    for i in range(0, n_test_samp, test_b_size):
+        ind = test_ind[i:i + test_b_size]
+        batch_x = [(testing_data[i][0].numpy() - mean) / std for i in ind]  # construct our test batch
+        batch_y = [testing_data[i][1] for i in ind]  # do the same for corresponding labels
+        test_imgs_batched.append(batch_x)
+        test_labels_batched.append(batch_y)
+
+    # construct train set
+    for i in range(0, n_train_samp, train_b_size):
+        ind = train_ind[i:i + train_b_size]
+        batch_x = [(training_data[i][0].numpy() - mean) / std for i in ind]   # construct our train batch
+        batch_y = [training_data[i][1] for i in ind]  # do the same for corresponding labels
+        train_imgs_batched.append(batch_x)
+        train_labels_batched.append(batch_y)
+
+    # zip labels with data
+    test_data_batched = zip(test_imgs_batched, test_labels_batched)
+    train_data_batched = zip(train_imgs_batched, train_labels_batched)
+
+    # return train_d, test_d
+    return train_data_batched, test_data_batched
 
 
-def train():
+def train(traindata):
     """
     Train the network for 1 epoch.
     """
-    print('Execute training')
+    print('--- Execute training ---')
     one_hot_label = np.zeros(10, dtype=np.uint8)
     vt_w_out_old, vt_b_out_old, vt_w_hidden_old, vt_b_hidden_old = 0, 0, 0, 0
 
     # loop over all mini-batches
-    for batch_id, (mini_batch, label) in enumerate(train_data):
+    for batch_id, (mini_batch, label) in enumerate(traindata):
 
-        sum_grad_w_hidden = np.zeros((network.input_dim, network.hidden1_dim))
-        sum_grad_w_output = np.zeros((network.hidden1_dim, network.output_dim))
-        sum_grad_b_hidden = np.zeros(network.hidden1_dim)
+        sum_grad_w_hidden = np.zeros((network.input_dim, network.hidden_dim))
+        sum_grad_w_output = np.zeros((network.hidden_dim, network.output_dim))
+        sum_grad_b_hidden = np.zeros(network.hidden_dim)
         sum_grad_b_output = np.zeros(network.output_dim)
         loss = 0
 
@@ -78,7 +108,6 @@ def train():
         grad_b_hidden = sum_grad_b_hidden / batch_size_train
 
         # add momentum gradient descent
-        # see https://towardsdatascience.com/stochastic-gradient-descent-with-momentum-a84097641a5d
         # vt = momentum * vt_old + LR * gradient
         vt_w_out = momentum * vt_w_out_old + LR * grad_w_output
         vt_b_out = momentum * vt_b_out_old + LR * grad_b_output
@@ -89,26 +118,26 @@ def train():
         vt_w_out_old, vt_b_out_old, vt_w_hidden_old, vt_b_hidden_old = vt_w_out, vt_b_out, vt_w_hidden, vt_b_hidden
 
         # update network parameters
-        network.weights_hidden1_output = network.weights_hidden1_output - vt_w_out
+        network.weights_hidden_output = network.weights_hidden_output - vt_w_out
         network.bias_output = network.bias_output - vt_b_out
-        network.weights_input_hidden1 = network.weights_input_hidden1 - vt_w_hidden
-        network.bias_hidden1 = network.bias_hidden1 - vt_b_hidden
+        network.weights_input_hidden = network.weights_input_hidden - vt_w_hidden
+        network.bias_hidden = network.bias_hidden - vt_b_hidden
 
         # if batch_id % 100 == 0:
         #     print('Batch {0}: Loss: {1}'.format(batch_id, loss / batch_size_train))
 
 
-def test():
+def test(input_test_data):
     """
     Run test batches on trained network
     :return: N/A
     """
-    print('Execute testing')
+    print('--- Execute testing ---')
     one_hot_label = np.zeros(10, dtype=np.uint8)
     correct_n = 0
     total_n = 0
 
-    for batch_id, (mini_batch, label) in enumerate(test_data):
+    for batch_id, (mini_batch, label) in enumerate(input_test_data):
 
         for sample_id, sample in enumerate(mini_batch):
             # Flatten input, create 748, input vector
@@ -118,18 +147,19 @@ def test():
             one_hot_label[label[sample_id]] = 1  # we require one-hot encoding for our input data
             lossr, result = network.forward_pass(flat_sample, one_hot_label)
 
-            # print('result {}'.format(result))
-            # print('label {}'.format(one_hot_label))
-
             # check if sample was correctly classified
             if (result == one_hot_label).all():
                 correct_n += 1
 
             total_n += 1
             one_hot_label[:] = 0
-
-    t_accuracy = (correct_n / total_n) * 100
-    return t_accuracy
+            
+    # print('batch_id at end: ', batch_id)
+    if total_n != 0:
+        return (correct_n / total_n) * 100
+    else:
+        print('Warning, total_n should not be 0')
+        return 0
 
 
 if __name__ == '__main__':
@@ -140,14 +170,14 @@ if __name__ == '__main__':
     n_train_samples = 60000
     batch_size_test = 1000
 
-    batch_size_train = 16
-    LR = 0.001
-    n_epochs = 20
-    momentum = 0.9
+    batch_size_train = 8
+    LR = 0.0001
+    n_epochs = 30
+    momentum = 0.99
 
     # network settings
     network.input_dim = 28 * 28  # 784 pixels
-    network.hidden1_dim = 128
+    network.hidden_dim = 256
     network.output_dim = 10
 
     # set to True if using ReLU activation, set to False if using sigmoid
@@ -159,19 +189,24 @@ if __name__ == '__main__':
     network.init_weights()
 
     # import data
-    train_data, test_data = import_data(batch_size_train, batch_size_test)
+    train_data, test_data = import_data(batch_size_train, batch_size_test, shuffle=True)
+
+    # make sure data list is iterable
+    train_data_iter = tuple(train_data)
+    test_data_iter = tuple(test_data)
 
     # train
     for epoch in range(n_epochs):
-        print('~~~~ {} seconds ~~~~'.format(round(time.time() - start_time, 0)))
-        print('Epoch: {}'.format(epoch))
-        train()
+        print('--- Epoch: {} - {} seconds ---'.format(epoch, round(time.time() - start_time, 0)))
 
         # calculate test accuracy
-        test_accuracy = test()
+        test_accuracy = test(test_data_iter)
         print('Test accuracy: {}%'.format(test_accuracy))
 
-    # calculate train accuracy
-    test_data = train_data
-    train_accuracy = test()
-    print('Train accuracy: {}%'.format(train_accuracy))
+        # 1 training epoch
+        train(train_data_iter)
+
+        # calculate train accuracy
+        # test_data = train_data
+        # train_accuracy = test(test_data)
+        # print('Train accuracy: {}%'.format(train_accuracy))
