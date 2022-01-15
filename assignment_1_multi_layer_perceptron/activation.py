@@ -1,6 +1,4 @@
 import numpy as np
-# use scipy to avoid exponential overflow issue, not enough time to fix it in the custom implementation
-from scipy.special import softmax as scipy_softmax
 
 
 def relu(x):
@@ -46,10 +44,10 @@ def softmax(x):
     :param x: N length array
     :return: Softmax for ach value between 0-1, N length array
     """
-    # print('x: {}'.format(x))
-    # this custom implementation gives overflow errors when used with momentum...
-    # np.exp(x) / np.sum(np.exp(x), axis=0)
-    return scipy_softmax(x)
+    max_val = 700
+    # this custom implementation gives overflow errors when used with momentum, so we clip...
+    np.clip(x, -max_val, max_val, out=x)
+    return np.exp(x) / np.sum(np.exp(x), axis=0)
 
 
 def softmax_bw(softmax_output, label):
