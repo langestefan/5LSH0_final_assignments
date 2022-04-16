@@ -3,6 +3,8 @@ This repository contains my code for the final assignments for 5LSH0 Computer vi
 
 ### Checklist:
 
- - Assignment 1: MLP [x]
- - Assignment 2: Re-id   [x]
- - Assignment 3: Pointcloud filter   [x]
+- [x] Assignment 1: Basic multilayer perceptron (MLP)
+- [x] Assignment 2: Re-identification (Re-id)
+- [x] Assignment 3: 3D Pointcloud filter based on vertical column aggregation
+
+
