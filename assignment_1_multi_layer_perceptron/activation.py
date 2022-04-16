@@ -13,7 +13,6 @@ def relu(x):
 def relu_bw(x):
     """
     Calculate element-wise ReLU derivative
-    See https://numpy.org/doc/stable/reference/generated/numpy.greater.html
     :param x: Input array
     :return: For each element in x: 1 if x>0, 0 if x<0, N length array
     """

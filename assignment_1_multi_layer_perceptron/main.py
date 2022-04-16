@@ -1,6 +1,4 @@
 from torchvision import datasets
-import torchvision
-import torch
 from torchvision.transforms import ToTensor
 import numpy as np
 import network
@@ -40,7 +38,7 @@ def import_data(train_b_size, test_b_size, shuffle=True):
         test_ind = rng.permutation(n_test_samp)
         train_ind = rng.permutation(n_train_samp)
 
-    # construct test setd
+    # construct test set
     for i in range(0, n_test_samp, test_b_size):
         ind = test_ind[i:i + test_b_size]
         batch_x = [(testing_data[i][0].numpy() - mean) / std for i in ind]  # construct our test batch
@@ -130,7 +128,7 @@ def train(traindata):
 def test(input_test_data):
     """
     Run test batches on trained network
-    :return: N/A
+    :return: Test accuracy [0-1]
     """
     print('--- Execute testing ---')
     one_hot_label = np.zeros(10, dtype=np.uint8)
